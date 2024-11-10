@@ -2,6 +2,7 @@ use std::io;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ccs::{ActionLabel, CCSSystem, Process};
+use crate::error::CCSResult;
 
 type Transition = (Process, ActionLabel, Process);
 type Trace = Vec<ActionLabel>;
@@ -63,7 +64,7 @@ impl Lts {
         }
     }
 
-    pub fn visualize(&self, f: &mut dyn io::Write) {
+    pub fn visualize(&self, f: &mut dyn io::Write) -> CCSResult<()> {
         let mut node_ids: HashMap<Process, usize> = HashMap::new();
         let mut id_counter = 0;
 
@@ -77,17 +78,19 @@ impl Lts {
             }
         };
 
-        writeln!(f, "digraph G {{");
+        writeln!(f, "digraph G {{")?;
         for (p, a, q) in self.transitions() {
             let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
             let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
 
-            writeln!(f, "  node_{} -> node_{} [label=\"{}\"]", p_id, q_id, a);
+            writeln!(f, "  node_{} -> node_{} [label=\"{}\"]", p_id, q_id, a)?;
         }
         for (name, id) in node_ids.iter() {
-            writeln!(f, "  node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"));
+            writeln!(f, "  node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"))?;
         }
-        writeln!(f, "}}");
+        writeln!(f, "}}")?;
+
+        Ok(())
     }
 }
 

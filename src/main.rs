@@ -60,7 +60,7 @@ fn lts(system: CCSSystem, graph: bool, x11: bool) -> CCSResult<()> {
     let lts = Lts::new(&system);
 
     if graph {
-        lts.visualize(&mut io::stdout())
+        lts.visualize(&mut io::stdout())?
     } else if x11 {
         let mut cmd = process::Command::new("dot")
             .arg("-Tx11")
@@ -69,7 +69,7 @@ fn lts(system: CCSSystem, graph: bool, x11: bool) -> CCSResult<()> {
             .stdout(process::Stdio::inherit())
             .spawn()
             .map_err(|_| CCSError::child_creation("dot".to_string()))?;
-        lts.visualize(&mut cmd.stdin.take().unwrap());
+        lts.visualize(&mut cmd.stdin.take().unwrap())?;
 
         let return_code = cmd.wait()
             .map_err(CCSError::file_error)?
