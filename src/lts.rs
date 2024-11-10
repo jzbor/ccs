@@ -1,4 +1,5 @@
-use std::collections::{HashSet, VecDeque};
+use std::io;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ccs::{ActionLabel, CCSSystem, Process};
 
@@ -60,6 +61,33 @@ impl Lts {
             cached_traces: VecDeque::new(),
             undiscovered_traces: VecDeque::from([ (Vec::new(), Process::ProcessName(destinct_process)) ]),
         }
+    }
+
+    pub fn visualize(&self, f: &mut dyn io::Write) {
+        let mut node_ids: HashMap<Process, usize> = HashMap::new();
+        let mut id_counter = 0;
+
+        let name_alloc = |process: &Process, counter: &mut usize, map: &mut HashMap<Process, usize>| {
+            if let Some(id) = map.get(&process) {
+                id.clone()
+            } else {
+                *counter += 1;
+                map.insert(process.clone(), *counter);
+                *counter
+            }
+        };
+
+        writeln!(f, "digraph G {{");
+        for (p, a, q) in self.transitions() {
+            let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
+            let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
+
+            writeln!(f, "  node_{} -> node_{} [label=\"{}\"]", p_id, q_id, a);
+        }
+        for (name, id) in node_ids.iter() {
+            writeln!(f, "  node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"));
+        }
+        writeln!(f, "}}");
     }
 }
 

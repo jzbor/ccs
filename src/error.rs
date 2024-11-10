@@ -18,7 +18,13 @@ pub enum CCSError {
     SyntaxError(#[from] pest::error::Error<parser::Rule>),
 
     #[error("File Error: {0}")]
-    FileError(#[from] std::io::Error),
+    File(#[from] std::io::Error),
+
+    #[error("Child Error: unable to execute '{0}'")]
+    ChildCreation(String),
+
+    #[error("Child Error: child exited with error '{0}'")]
+    ChildExited(i32),
 }
 
 impl CCSError {
@@ -30,8 +36,16 @@ impl CCSError {
         CCSError::ParsingRuleNotFound(format!("{:?}", rule))
     }
 
+    pub fn child_creation(name: String) -> Self {
+        CCSError::ChildCreation(name)
+    }
+
+    pub fn child_exited(code: i32) -> Self {
+        CCSError::ChildExited(code)
+    }
+
     pub fn file_error(e: std::io::Error) -> Self {
-        CCSError::FileError(e)
+        CCSError::File(e)
     }
 }
 

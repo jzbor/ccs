@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::fs;
+use std::io;
 use std::process;
 
 use ccs::CCSSystem;
-use ccs::Process;
 use clap::Parser;
 use error::CCSError;
 use error::CCSResult;
@@ -33,10 +32,15 @@ enum Subcommand {
     /// Print out all traces of the LTS for the given CCS
     Trace {},
 
-    /// Print or visualize the LTS for the given CCS
+    /// Print or visualize the Labeled Transition System for the given CCS
     Lts {
+        /// Print in dot format for graph visualization
         #[clap(short, long)]
-        dot: bool,
+        graph: bool,
+
+        /// Open graph with graphviz in x11 mode
+        #[clap(short, long)]
+        x11: bool,
     },
 
     /// Display the syntax tree derived by the parser
@@ -49,37 +53,33 @@ fn parse(system: CCSSystem) -> CCSResult<()> {
     Ok(())
 }
 
-fn lts(system: CCSSystem, dot: bool) -> CCSResult<()> {
+fn lts(system: CCSSystem, graph: bool, x11: bool) -> CCSResult<()> {
     let lts = Lts::new(&system);
-    if !dot {
+
+    if graph {
+        lts.visualize(&mut io::stdout())
+    } else if x11 {
+        let mut cmd = process::Command::new("dot")
+            .arg("-Tx11")
+            .stdin(process::Stdio::piped())
+            .stderr(process::Stdio::inherit())
+            .stdout(process::Stdio::inherit())
+            .spawn()
+            .map_err(|_| CCSError::child_creation("dot".to_string()))?;
+        lts.visualize(&mut cmd.stdin.take().unwrap());
+
+        let return_code = cmd.wait()
+            .map_err(CCSError::file_error)?
+            .code();
+        if let Some(x) = return_code {
+            if x != 0 {
+                return Err(CCSError::child_exited(x));
+            }
+        }
+    } else {
         for (p, a, q) in lts.transitions() {
             println!("{} --{}--> {}", p, a, q);
         }
-    } else {
-        let mut node_ids: HashMap<Process, usize> = HashMap::new();
-        let mut id_counter = 0;
-
-        let name_alloc = |process: &Process, counter: &mut usize, map: &mut HashMap<Process, usize>| {
-            if let Some(id) = map.get(&process) {
-                id.clone()
-            } else {
-                *counter += 1;
-                map.insert(process.clone(), *counter);
-                *counter
-            }
-        };
-
-        println!("digraph G {{");
-        for (p, a, q) in lts.transitions() {
-            let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
-            let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
-
-            println!("  node_{} -> node_{} [label=\"{}\"]", p_id, q_id, a);
-        }
-        for (name, id) in node_ids.iter() {
-            println!("  node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"));
-        }
-        println!("}}");
     }
 
     Ok(())
@@ -101,7 +101,6 @@ fn syntax_tree(contents: &str) -> CCSResult<()> {
     Ok(())
 }
 
-
 fn main() {
     let args = Args::parse();
 
@@ -121,7 +120,7 @@ fn main() {
 
     let result = match args.subcommand {
         Subcommand::Parse {} => parse(system),
-        Subcommand::Lts { dot } => lts(system, dot),
+        Subcommand::Lts { graph, x11 } => lts(system, graph, x11),
         Subcommand::Trace {} => trace(system),
         Subcommand::SyntaxTree {} => Ok(()),
     };
