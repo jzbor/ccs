@@ -69,8 +69,8 @@ impl Lts {
         let mut id_counter = 0;
 
         let name_alloc = |process: &Process, counter: &mut usize, map: &mut HashMap<Process, usize>| {
-            if let Some(id) = map.get(&process) {
-                id.clone()
+            if let Some(id) = map.get(process) {
+                *id
             } else {
                 *counter += 1;
                 map.insert(process.clone(), *counter);

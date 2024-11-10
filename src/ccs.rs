@@ -14,6 +14,7 @@ pub struct CCSSystem {
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Process {
     Deadlock(),
+    #[allow(clippy::enum_variant_names)]
     ProcessName(ProcessName),
     Action(ActionLabel, Box<Self>),
     NonDetChoice(Box<Self>, Box<Self>),

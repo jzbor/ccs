@@ -102,7 +102,8 @@ fn parse_system(pair: Pair<Rule>) -> CCSResult<CCSSystem> {
 }
 
 pub fn first_pass(input: &str) -> CCSResult<Pair<'_, Rule>> {
-    Ok(CCSParser::parse(Rule::system, input)?
+    Ok(CCSParser::parse(Rule::system, input)
+        .map_err(CCSError::syntax_error)?
         .next().unwrap())
 }
 

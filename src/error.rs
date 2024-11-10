@@ -15,7 +15,7 @@ pub enum CCSError {
     ParsingRuleNotFound(String),
 
     #[error("Syntax Error:\n{0}")]
-    SyntaxError(#[from] pest::error::Error<parser::Rule>),
+    SyntaxError(Box<pest::error::Error<parser::Rule>>),
 
     #[error("File Error: {0}")]
     File(#[from] std::io::Error),
@@ -46,6 +46,10 @@ impl CCSError {
 
     pub fn file_error(e: std::io::Error) -> Self {
         CCSError::File(e)
+    }
+
+    pub fn syntax_error(e: pest::error::Error<parser::Rule>) -> Self {
+        CCSError::SyntaxError(Box::new(e))
     }
 }
 
