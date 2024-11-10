@@ -134,7 +134,8 @@ impl<'a> Iterator for LtsStateIterator<'a> {
         let direct_successors = item.direct_successors(&self.lts.system)
             .unwrap()
             .into_iter()
-            .map(|(_, succ)| succ);
+            .map(|(_, succ)| succ)
+            .filter(|s| !self.discovered_states.contains(s) && *s != item);
         self.undiscovered_states.extend(direct_successors);
 
         self.discovered_states.insert(item.clone());

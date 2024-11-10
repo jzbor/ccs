@@ -32,6 +32,9 @@ enum Subcommand {
     /// Print out all traces of the LTS for the given CCS
     Trace {},
 
+    /// Print out all states of the LTS for the given CCS
+    States {},
+
     /// Print or visualize the Labeled Transition System for the given CCS
     Lts {
         /// Print in dot format for graph visualization
@@ -96,6 +99,16 @@ fn trace(system: CCSSystem) -> CCSResult<()> {
     Ok(())
 }
 
+fn states(system: CCSSystem) -> CCSResult<()> {
+    let lts = Lts::new(&system);
+
+    for state in lts.states() {
+        println!("{}", state);
+    }
+
+    Ok(())
+}
+
 fn syntax_tree(contents: &str) -> CCSResult<()> {
     println!("{:#?}", parser::first_pass(contents));
     Ok(())
@@ -119,10 +132,11 @@ fn main() {
     };
 
     let result = match args.subcommand {
-        Subcommand::Parse {} => parse(system),
         Subcommand::Lts { graph, x11 } => lts(system, graph, x11),
-        Subcommand::Trace {} => trace(system),
+        Subcommand::Parse {} => parse(system),
+        Subcommand::States {} => states(system),
         Subcommand::SyntaxTree {} => Ok(()),
+        Subcommand::Trace {} => trace(system),
     };
 
     error::resolve(result);
