@@ -9,12 +9,17 @@
 
   outputs = { self, nixpkgs, cf, crane, ... }: (cf.mkLib nixpkgs).flakeForDefaultSystems (system:
   let
+    inherit (nixpkgs) lib;
     pkgs = nixpkgs.legacyPackages.${system};
     craneLib = crane.mkLib pkgs;
   in {
     packages.default = craneLib.buildPackage {
       src = ./.;
       strictDeps = true;
+      nativeBuildInputs = [ pkgs.makeWrapper ];
+      postInstall = ''
+        wrapProgram $out/bin/ccs --prefix PATH : ${lib.makeBinPath [ pkgs.graphviz ]}
+      '';
     };
 
     devShells.default = craneLib.devShell {
