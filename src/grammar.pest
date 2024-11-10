@@ -7,7 +7,7 @@ action          = { action_name ~ "." ~ process_group }
 summation       = { process_group ~ "+" ~ process }
 parallel        = { process_group ~ "|" ~ process }
 rename          = { process ~ "[" ~ action_name ~ "/" ~ action_name ~ "]" }
-restriction     = { process_group ~ "\\" ~ action_name }
+restriction     = { process_group ~ ("\\" ~ action_name)+ }
 process_name    = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
 action_name     = @{ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* ~ "'"?}
 

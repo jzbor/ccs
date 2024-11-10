@@ -43,8 +43,12 @@ fn parse_process(pair: Pair<Rule>) -> CCSResult<Process> {
         Rule::restriction => {
             let mut inner = pair.into_inner();
             let process = Box::new(parse_process(inner.next().unwrap())?);
-            let restriction = inner.next().unwrap().as_span().as_str().to_owned();
-            Ok(Process::Restriction(process, restriction.into()))
+            let first_label = inner.next().unwrap().as_span().as_str().to_owned();
+            let mut restriction = Process::Restriction(process, first_label.into());
+            for label in inner.map(|p| p.as_span().as_str().to_owned()) {
+                restriction = Process::Restriction(Box::new(restriction), label.into())
+            }
+            Ok(restriction)
         },
         Rule::process_name => Ok(Process::ProcessName(pair.as_span().as_str().to_owned().into())),
         _ => Err(CCSError::parsing_unexpected_rule(pair.as_rule())),
