@@ -1,0 +1,3 @@
+SmUni = (CoffeeMachine | ComputerScientist) \ coin \ coffee
+CoffeeMachine = coin.coffee'.CoffeeMachine
+ComputerScientist = pub'.coin'.coffee.ComputerScientist
