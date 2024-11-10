@@ -13,7 +13,7 @@
     craneLib = crane.mkLib pkgs;
   in {
     packages.default = craneLib.buildPackage {
-      src = craneLib.cleanCargoSource ./.;
+      src = ./.;
       strictDeps = true;
     };
 
