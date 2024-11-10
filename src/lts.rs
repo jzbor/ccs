@@ -26,6 +26,7 @@ pub struct LtsStateIterator<'a> {
 
 pub struct LtsTraceIterator<'a> {
     lts: &'a Lts,
+    discovered_traces: HashSet<(Trace, Process)>,
     undiscovered_traces: VecDeque<(Trace, Process)>,
     cached_traces: VecDeque<Trace>,
 }
@@ -60,6 +61,7 @@ impl Lts {
         LtsTraceIterator {
             lts: self,
             cached_traces: VecDeque::new(),
+            discovered_traces: HashSet::new(),
             undiscovered_traces: VecDeque::from([ (Vec::new(), Process::ProcessName(destinct_process)) ]),
         }
     }
@@ -110,7 +112,7 @@ impl<'a> Iterator for LtsTransitionIterator<'a> {
             .unwrap()
             .into_iter()
             .map(|(_, succ)| succ)
-            .filter(|s| !self.discovered_states.contains(s) && *s != item);
+            .filter(|s| !self.discovered_states.contains(s));
         self.undiscovered_states.extend(direct_successors);
 
         let transitions: HashSet<_> = item.direct_successors(&self.lts.system)
@@ -122,6 +124,7 @@ impl<'a> Iterator for LtsTransitionIterator<'a> {
 
         self.discovered_states.insert(item);
         self.cached_transitions.pop_front()
+            .or_else(|| if !self.undiscovered_states.is_empty() { self.next() } else { None })
     }
 }
 
@@ -168,9 +171,16 @@ impl<'a> Iterator for LtsTraceIterator<'a> {
                 (new_trace, succ)
             })
             .collect();
-        self.cached_traces.extend(traces.iter().map(|(t, _)| t.clone()));
+        let newly_cached: HashSet<_> = traces.iter()
+            .filter(|tp| !self.discovered_traces.contains(tp) && !self.cached_traces.contains(&tp.0))
+            .map(|(t, _)| t.clone())
+            .collect();
+        self.cached_traces.extend(newly_cached);
         self.undiscovered_traces.extend(traces);
 
+        self.discovered_traces.insert(item.clone());
+
         self.cached_traces.pop_front()
+            .or_else(|| if !self.undiscovered_traces.is_empty() { self.next() } else { None })
     }
 }
