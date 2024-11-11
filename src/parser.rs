@@ -77,7 +77,7 @@ fn parse_specification(pair: Pair<Rule>) -> CCSResult<(ProcessName, Process)> {
     Ok((name.into(), process))
 }
 
-fn parse_system(pair: Pair<Rule>) -> CCSResult<CCSSystem> {
+fn parse_system(pair: Pair<Rule>, name: String) -> CCSResult<CCSSystem> {
     if pair.as_rule() != Rule::system {
         return Err(CCSError::parsing_unexpected_rule(pair.as_rule()));
     }
@@ -98,7 +98,7 @@ fn parse_system(pair: Pair<Rule>) -> CCSResult<CCSSystem> {
     let destinct_process = destinct_process
         .ok_or(CCSError::parsing_rule_not_found(Rule::specification))?;
 
-    Ok(CCSSystem::new(processes, destinct_process))
+    Ok(CCSSystem::new(name, processes, destinct_process))
 }
 
 pub fn first_pass(input: &str) -> CCSResult<Pair<'_, Rule>> {
@@ -107,8 +107,8 @@ pub fn first_pass(input: &str) -> CCSResult<Pair<'_, Rule>> {
         .next().unwrap())
 }
 
-pub fn parse(input: &str) -> CCSResult<CCSSystem> {
+pub fn parse(name: String, input: &str) -> CCSResult<CCSSystem> {
     let first_pass = first_pass(input)?;
-    let second_pass = parse_system(first_pass)?;
+    let second_pass = parse_system(first_pass, name)?;
     Ok(second_pass)
 }

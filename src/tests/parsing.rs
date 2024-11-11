@@ -5,9 +5,9 @@ use crate::parser;
 fn parse_file_twice(file: &str) {
     let contents = fs::read_to_string(file).unwrap();
 
-    let first_parse_iteration = parser::parse(&contents).unwrap();
+    let first_parse_iteration = parser::parse(file.to_string(), &contents).unwrap();
     let first_string = first_parse_iteration.to_string();
-    let second_parse_iteration = parser::parse(&first_string).unwrap();
+    let second_parse_iteration = parser::parse(file.to_string(), &first_string).unwrap();
 
     for (name, spec) in first_parse_iteration.processes() {
         assert_eq!(spec.to_string(), second_parse_iteration.processes().get(name).unwrap().to_string(), "[{}]", file);

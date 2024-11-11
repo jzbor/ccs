@@ -101,9 +101,9 @@ fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool) -> CC
 
     let compare_lts_opt = match compare {
         Some(path) => {
-            let contents = fs::read_to_string(path)
+            let contents = fs::read_to_string(&path)
                 .map_err(CCSError::file_error)?;
-            let compare_lts = Lts::new(&parser::parse(&contents)?);
+            let compare_lts = Lts::new(&parser::parse(path, &contents)?);
             Some(compare_lts)
         },
         None => None,
@@ -186,9 +186,10 @@ fn syntax_tree(contents: &str) -> CCSResult<()> {
 
 fn main() {
     let args = Args::parse();
+    let path = args.subcommand.common().file.clone();
 
     let contents = error::resolve(
-        fs::read_to_string(&args.subcommand.common().file)
+        fs::read_to_string(&path)
             .map_err(CCSError::file_error)
     );
 
@@ -196,7 +197,7 @@ fn main() {
         error::resolve(syntax_tree(&contents));
     }
 
-    let system = match parser::parse(&contents) {
+    let system = match parser::parse(path, &contents) {
         Ok(system) => system,
         Err(e) => {eprintln!("{}", e); process::exit(1) },
     };

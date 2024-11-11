@@ -72,6 +72,7 @@ impl Lts {
 
     pub fn visualize_all(systems: &[&Lts], f: &mut dyn io::Write) -> CCSResult<()> {
         let mut id_counter = 0;
+        let nsystems = systems.len();
 
         let name_alloc = |process: &Process, counter: &mut usize, map: &mut HashMap<Process, usize>| {
             if let Some(id) = map.get(process) {
@@ -85,22 +86,34 @@ impl Lts {
 
         writeln!(f, "digraph G {{")?;
 
-        for lts in systems {
+        for (i, lts) in systems.iter().enumerate() {
             let mut node_ids: HashMap<Process, usize> = HashMap::new();
 
             if id_counter != 0 {
                 writeln!(f)?;
             }
 
+            if nsystems > 1 {
+                writeln!(f, "  subgraph cluster{} {{", i)?;
+                writeln!(f, "    color=lightgrey")?;
+                writeln!(f, "    fontcolor=darkgrey")?;
+                writeln!(f, "    margin=20")?;
+                writeln!(f, "    label=\"{}\"", lts.system.name())?;
+            }
+
             for (p, a, q) in lts.transitions() {
                 let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
                 let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
 
-                writeln!(f, "  node_{} -> node_{} [label=\"{}\"]", p_id, q_id, a)?;
+                writeln!(f, "    node_{} -> node_{} [label=\"{}\"]", p_id, q_id, a)?;
             }
 
             for (name, id) in node_ids.iter() {
-                writeln!(f, "  node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"))?;
+                writeln!(f, "    node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"))?;
+            }
+
+            if nsystems > 1 {
+                writeln!(f, "  }}")?;
             }
         }
 

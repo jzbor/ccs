@@ -7,6 +7,7 @@ pub type ActionLabel = Rc<String>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CCSSystem {
+    name: String,
     processes: HashMap<ProcessName, Process>,
     destinct_process: ProcessName,
 }
@@ -24,8 +25,8 @@ pub enum Process {
 }
 
 impl CCSSystem {
-    pub fn new(processes: HashMap<ProcessName, Process>, destinct_process: ProcessName) -> Self {
-        CCSSystem { processes, destinct_process }
+    pub fn new(name: String, processes: HashMap<ProcessName, Process>, destinct_process: ProcessName) -> Self {
+        CCSSystem { name, processes, destinct_process }
     }
 
     pub fn processes(&self) -> &HashMap<ProcessName, Process> {
@@ -34,6 +35,10 @@ impl CCSSystem {
 
     pub fn destinct_process(&self) -> &ProcessName {
         &self.destinct_process
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
