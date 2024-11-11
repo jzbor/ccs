@@ -15,30 +15,38 @@ mod error;
 #[cfg(test)]
 mod tests;
 
-#[derive(Parser, Debug)]
+#[derive(clap::Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[clap(subcommand)]
     subcommand: Subcommand,
-
-    /// File with CCS specification
-    #[clap(global=true, default_value_t = String::from("default.ccs"))]
-    file: String,
 }
 
 #[derive(Clone, Debug, PartialEq, clap::Subcommand)]
 enum Subcommand {
     /// Parse and echo the CCS specification
-    Parse {},
+    Parse {
+        #[command(flatten)]
+        common: CommonArgs,
+    },
 
     /// Print out all traces of the LTS for the given CCS
-    Trace {},
+    Trace {
+        #[command(flatten)]
+        common: CommonArgs,
+    },
 
     /// Print out all states of the LTS for the given CCS
-    States {},
+    States {
+        #[command(flatten)]
+        common: CommonArgs,
+    },
 
     /// Print or visualize the Labeled Transition System for the given CCS
     Lts {
+        #[command(flatten)]
+        common: CommonArgs,
+
         /// Print in dot format for graph visualization
         #[clap(short, long)]
         graph: bool,
@@ -50,8 +58,34 @@ enum Subcommand {
 
     /// Display the syntax tree derived by the parser
     #[clap(hide(true))]
-    SyntaxTree {},
+    SyntaxTree {
+        #[command(flatten)]
+        common: CommonArgs,
+    },
 }
+
+#[derive(clap::Args, Debug, PartialEq, Clone)]
+struct CommonArgs {
+    /// File with CCS specification
+    // #[clap(global=true, default_value_t = String::from("default.ccs"))]
+    #[clap()]
+    file: String,
+}
+
+
+impl Subcommand {
+    fn common(&self) -> &CommonArgs {
+        use Subcommand::*;
+        match self {
+            Parse { common } => common,
+            Trace { common } => common,
+            States { common } => common,
+            Lts { common, .. } => common,
+            SyntaxTree { common } => common,
+        }
+    }
+}
+
 
 fn parse(system: CCSSystem) -> CCSResult<()> {
     println!("{}", system);
@@ -120,11 +154,11 @@ fn main() {
     let args = Args::parse();
 
     let contents = error::resolve(
-        fs::read_to_string(args.file)
+        fs::read_to_string(&args.subcommand.common().file)
             .map_err(CCSError::file_error)
     );
 
-    if let Subcommand::SyntaxTree {} = args.subcommand {
+    if let Subcommand::SyntaxTree {..} = args.subcommand {
         error::resolve(syntax_tree(&contents));
     }
 
@@ -134,11 +168,11 @@ fn main() {
     };
 
     let result = match args.subcommand {
-        Subcommand::Lts { graph, x11 } => lts(system, graph, x11),
-        Subcommand::Parse {} => parse(system),
-        Subcommand::States {} => states(system),
-        Subcommand::SyntaxTree {} => Ok(()),
-        Subcommand::Trace {} => trace(system),
+        Subcommand::Lts { graph, x11, .. } => lts(system, graph, x11),
+        Subcommand::Parse {..} => parse(system),
+        Subcommand::States {..} => states(system),
+        Subcommand::SyntaxTree {..} => Ok(()),
+        Subcommand::Trace {..} => trace(system),
     };
 
     error::resolve(result);
