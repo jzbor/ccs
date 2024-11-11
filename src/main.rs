@@ -12,6 +12,8 @@ mod ccs;
 mod parser;
 mod lts;
 mod error;
+#[cfg(test)]
+mod tests;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

@@ -5,7 +5,7 @@ const TAU: &str = "τ";
 pub type ProcessName = Rc<String>;
 pub type ActionLabel = Rc<String>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CCSSystem {
     processes: HashMap<ProcessName, Process>,
     destinct_process: ProcessName,
