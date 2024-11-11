@@ -139,7 +139,7 @@ impl<'a> Iterator for LtsTransitionIterator<'a> {
             .unwrap()
             .into_iter()
             .map(|(_, succ)| succ)
-            .filter(|s| !self.discovered_states.contains(s));
+            .filter(|s| !self.discovered_states.contains(s) && *s != item);
         self.undiscovered_states.extend(direct_successors);
 
         let transitions: HashSet<_> = item.direct_successors(&self.lts.system)
