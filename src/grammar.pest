@@ -9,7 +9,7 @@ parallel        = { process_group ~ "|" ~ process }
 rename          = { process ~ "[" ~ action_name ~ "/" ~ action_name ~ "]" }
 restriction     = { process_group ~ ("\\" ~ action_name)+ }
 process_name    = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
-action_name     = @{ ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* ~ "'"?}
+action_name     = @{ (ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* ~ "'"?) | '\u{1D70F}'..'\u{1D70F}' }
 
 NEWLINE      = { "\r" | "\n" }
 WHITESPACE   = _{ " " | "\t" }
