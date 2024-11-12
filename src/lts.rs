@@ -13,6 +13,7 @@ pub struct Lts {
 
 pub struct LtsTransitionIterator<'a> {
     lts: &'a Lts,
+    allow_duplicates: bool,
     discovered_states: HashSet<Process>,
     cached_transitions: VecDeque<Transition>,
     undiscovered_states: VecDeque<Process>,
@@ -20,12 +21,14 @@ pub struct LtsTransitionIterator<'a> {
 
 pub struct LtsStateIterator<'a> {
     lts: &'a Lts,
+    allow_duplicates: bool,
     discovered_states: HashSet<Process>,
     undiscovered_states: VecDeque<Process>,
 }
 
 pub struct LtsTraceIterator<'a> {
     lts: &'a Lts,
+    allow_duplicates: bool,
     discovered_traces: HashSet<(Trace, Process)>,
     undiscovered_traces: VecDeque<(Trace, Process)>,
     cached_traces: VecDeque<Trace>,
@@ -37,29 +40,32 @@ impl Lts {
         Lts { system: system.clone() }
     }
 
-    pub fn transitions(&self) -> LtsTransitionIterator {
+    pub fn transitions(&self, allow_duplicates: bool) -> LtsTransitionIterator {
         let destinct_process = self.system.destinct_process().clone();
         LtsTransitionIterator {
             lts: self,
+            allow_duplicates,
             discovered_states: HashSet::new(),
             cached_transitions: VecDeque::new(),
             undiscovered_states: VecDeque::from([ Process::ProcessName(destinct_process) ]),
         }
     }
 
-    pub fn states(&self) -> LtsStateIterator {
+    pub fn states(&self, allow_duplicates: bool) -> LtsStateIterator {
         let destinct_process = self.system.destinct_process().clone();
         LtsStateIterator {
             lts: self,
+            allow_duplicates,
             discovered_states: HashSet::new(),
             undiscovered_states: VecDeque::from([ Process::ProcessName(destinct_process) ]),
         }
     }
 
-    pub fn traces(&self) -> LtsTraceIterator {
+    pub fn traces(&self, allow_duplicates: bool) -> LtsTraceIterator {
         let destinct_process = self.system.destinct_process().clone();
         LtsTraceIterator {
             lts: self,
+            allow_duplicates,
             cached_traces: VecDeque::new(),
             discovered_traces: HashSet::new(),
             undiscovered_traces: VecDeque::from([ (Vec::new(), Process::ProcessName(destinct_process)) ]),
@@ -101,7 +107,7 @@ impl Lts {
                 writeln!(f, "    label=\"{}\"", lts.system.name())?;
             }
 
-            for (p, a, q) in lts.transitions() {
+            for (p, a, q) in lts.transitions(false) {
                 let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
                 let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
 
@@ -149,7 +155,9 @@ impl<'a> Iterator for LtsTransitionIterator<'a> {
             .collect();
         self.cached_transitions.extend(transitions);
 
-        self.discovered_states.insert(item);
+        if !self.allow_duplicates {
+            self.discovered_states.insert(item);
+        }
         self.cached_transitions.pop_front()
             .or_else(|| if !self.undiscovered_states.is_empty() { self.next() } else { None })
     }
@@ -164,14 +172,18 @@ impl<'a> Iterator for LtsStateIterator<'a> {
             None => return None,
         };
 
-        let direct_successors = item.direct_successors(&self.lts.system)
+        let mut direct_successors = item.direct_successors(&self.lts.system)
             .unwrap()
             .into_iter()
             .map(|(_, succ)| succ)
-            .filter(|s| !self.discovered_states.contains(s) && *s != item);
+            .filter(|s| !self.discovered_states.contains(s) && *s != item)
+            .collect::<Vec<_>>();
+        direct_successors.dedup();
         self.undiscovered_states.extend(direct_successors);
 
-        self.discovered_states.insert(item.clone());
+        if !self.allow_duplicates {
+            self.discovered_states.insert(item.clone());
+        }
 
         Some(item)
     }
@@ -205,7 +217,9 @@ impl<'a> Iterator for LtsTraceIterator<'a> {
         self.cached_traces.extend(newly_cached);
         self.undiscovered_traces.extend(traces);
 
-        self.discovered_traces.insert(item.clone());
+        if !self.allow_duplicates {
+            self.discovered_traces.insert(item.clone());
+        }
 
         self.cached_traces.pop_front()
             .or_else(|| if !self.undiscovered_traces.is_empty() { self.next() } else { None })

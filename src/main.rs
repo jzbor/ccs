@@ -34,12 +34,20 @@ enum Subcommand {
     Trace {
         #[command(flatten)]
         common: CommonArgs,
+
+        /// Allow duplicates (saves memory)
+        #[clap(short, long)]
+        allow_duplicates: bool,
     },
 
     /// Print out all states of the LTS for the given CCS
     States {
         #[command(flatten)]
         common: CommonArgs,
+
+        /// Allow duplicates (saves memory)
+        #[clap(short, long)]
+        allow_duplicates: bool,
     },
 
     /// Print or visualize the Labeled Transition System for the given CCS
@@ -58,6 +66,10 @@ enum Subcommand {
         /// Another ccs file to compare
         #[clap(short, long)]
         compare: Option<String>,
+
+        /// Allow duplicates (saves memory)
+        #[clap(short, long)]
+        allow_duplicates: bool,
     },
 
     /// Display the syntax tree derived by the parser
@@ -82,8 +94,8 @@ impl Subcommand {
         use Subcommand::*;
         match self {
             Parse { common } => common,
-            Trace { common } => common,
-            States { common } => common,
+            Trace { common, .. } => common,
+            States { common, .. } => common,
             Lts { common, .. } => common,
             SyntaxTree { common } => common,
         }
@@ -96,7 +108,7 @@ fn parse(system: CCSSystem) -> CCSResult<()> {
     Ok(())
 }
 
-fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool) -> CCSResult<()> {
+fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool, allow_duplicates: bool) -> CCSResult<()> {
     let lts = Lts::new(&system);
 
     let compare_lts_opt = match compare {
@@ -143,13 +155,13 @@ fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool) -> CC
     }
 
     if !x11 && !graph {
-        for (p, a, q) in lts.transitions() {
+        for (p, a, q) in lts.transitions(allow_duplicates) {
             println!("{} --{}--> {}", p, a, q);
         }
 
         if let Some(compare_lts) = compare_lts_opt {
             println!();
-            for (p, a, q) in compare_lts.transitions() {
+            for (p, a, q) in compare_lts.transitions(allow_duplicates) {
                 println!("{} --{}--> {}", p, a, q);
             }
         }
@@ -158,10 +170,10 @@ fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool) -> CC
     Ok(())
 }
 
-fn trace(system: CCSSystem) -> CCSResult<()> {
+fn trace(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
     let lts = Lts::new(&system);
 
-    for trace in lts.traces() {
+    for trace in lts.traces(allow_duplicates) {
         let words: Vec<String> = trace.into_iter().map(|s| (*s).clone()).collect();
         println!("{}", words.join(","));
     }
@@ -169,10 +181,10 @@ fn trace(system: CCSSystem) -> CCSResult<()> {
     Ok(())
 }
 
-fn states(system: CCSSystem) -> CCSResult<()> {
+fn states(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
     let lts = Lts::new(&system);
 
-    for state in lts.states() {
+    for state in lts.states(allow_duplicates) {
         println!("{}", state);
     }
 
@@ -203,11 +215,11 @@ fn main() {
     };
 
     let result = match args.subcommand {
-        Subcommand::Lts { graph, x11, compare, .. } => lts(system, compare, graph, x11),
+        Subcommand::Lts { graph, x11, compare, allow_duplicates, .. } => lts(system, compare, graph, x11, allow_duplicates),
         Subcommand::Parse {..} => parse(system),
-        Subcommand::States {..} => states(system),
+        Subcommand::States { allow_duplicates, .. } => states(system, allow_duplicates),
         Subcommand::SyntaxTree {..} => Ok(()),
-        Subcommand::Trace {..} => trace(system),
+        Subcommand::Trace { allow_duplicates, .. } => trace(system, allow_duplicates),
     };
 
     error::resolve(result);
