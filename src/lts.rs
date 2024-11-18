@@ -142,14 +142,12 @@ impl<'a> Iterator for LtsTransitionIterator<'a> {
         };
 
         let direct_successors = item.direct_successors(&self.lts.system)
-            .unwrap()
             .into_iter()
             .map(|(_, succ)| succ)
             .filter(|s| !self.discovered_states.contains(s) && *s != item);
         self.undiscovered_states.extend(direct_successors);
 
         let transitions: HashSet<_> = item.direct_successors(&self.lts.system)
-            .unwrap_or(HashSet::new())  // ignores errors
             .into_iter()
             .map(|(label, succ)| (item.clone(), label, succ))
             .collect();
@@ -173,7 +171,6 @@ impl<'a> Iterator for LtsStateIterator<'a> {
         };
 
         let mut direct_successors = item.direct_successors(&self.lts.system)
-            .unwrap()
             .into_iter()
             .map(|(_, succ)| succ)
             .filter(|s| !self.discovered_states.contains(s) && *s != item)
@@ -202,7 +199,6 @@ impl<'a> Iterator for LtsTraceIterator<'a> {
         };
 
         let traces: HashSet<_> = item.1.direct_successors(&self.lts.system)
-            .unwrap()
             .into_iter()
             .map(|(label, succ)| {
                 let mut new_trace = item.0.clone();
