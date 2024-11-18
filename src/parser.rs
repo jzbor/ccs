@@ -20,7 +20,12 @@ fn parse_process(pair: Pair<Rule>) -> CCSResult<Process> {
             let mut inner = pair.into_inner();
             let action = inner.next().unwrap().as_span().as_str().to_owned();
             let process = Box::new(parse_process(inner.next().unwrap())?);
-            Ok(Process::Action(action.into(), process))
+
+            if action == "tau" {
+                Ok(Process::Action(String::from("τ").into(), process))
+            } else {
+                Ok(Process::Action(action.into(), process))
+            }
         },
         Rule::summation => {
             let mut inner = pair.into_inner();
