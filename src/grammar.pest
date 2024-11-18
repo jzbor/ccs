@@ -8,7 +8,7 @@ summation       = { process_group ~ "+" ~ process }
 parallel        = { process_group ~ "|" ~ process }
 rename          = { process ~ "[" ~ action_name ~ "/" ~ action_name ~ "]" }
 restriction     = { process_group ~ ("\\" ~ action_name)+ }
-process_name    = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
+process_name    = @{ (ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC*) | "_" }
 action_name     = @{ (ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* ~ "'"?) | "τ" }
 
 NEWLINE      = { "\r" | "\n" }

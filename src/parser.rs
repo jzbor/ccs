@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
@@ -50,7 +51,14 @@ fn parse_process(pair: Pair<Rule>) -> CCSResult<Process> {
             }
             Ok(restriction)
         },
-        Rule::process_name => Ok(Process::ProcessName(pair.as_span().as_str().to_owned().into())),
+        Rule::process_name => {
+            let name: Rc<_> = pair.as_span().as_str().to_owned().into();
+            if *name == "_" {
+                Err(CCSError::parsing_anonymous_process())
+            } else {
+                Ok(Process::ProcessName(name))
+            }
+        },
         _ => Err(CCSError::parsing_unexpected_rule(pair.as_rule())),
     }
 }

@@ -14,6 +14,9 @@ pub enum CCSError {
     #[error("Parsing Error: rule not found - {0}")]
     ParsingRuleNotFound(String),
 
+    #[error("Parsing Error: anonymous processes not allowed on rhs")]
+    ParsingAnonymousProcess(),
+
     #[error("Syntax Error:\n{0}")]
     SyntaxError(Box<pest::error::Error<parser::Rule>>),
 
@@ -34,6 +37,10 @@ impl CCSError {
 
     pub fn parsing_rule_not_found(rule: parser::Rule) -> Self {
         CCSError::ParsingRuleNotFound(format!("{:?}", rule))
+    }
+
+    pub fn parsing_anonymous_process() -> Self {
+        CCSError::ParsingAnonymousProcess()
     }
 
     pub fn child_creation(name: String) -> Self {

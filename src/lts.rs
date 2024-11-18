@@ -115,7 +115,11 @@ impl Lts {
             }
 
             for (name, id) in node_ids.iter() {
-                writeln!(f, "    node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"))?;
+                if name.to_string() == "_" {
+                    writeln!(f, "    node_{} [label=\"\"]", id)?;
+                } else {
+                    writeln!(f, "    node_{} [label=\"{}\"]", id, name.to_string().replace("\\", "\\\\"))?;
+                }
             }
 
             if nsystems > 1 {
