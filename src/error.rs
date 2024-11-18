@@ -8,14 +8,14 @@ pub type CCSResult<T> = Result<T, CCSError>;
 
 #[derive(Error, Debug)]
 pub enum CCSError {
-    #[error("Parsing Error: unexpected rule - {0}")]
-    ParsingUnexpectedRule(String),
+    #[error("Parsing Error: unexpected rule - {0} [{1}:{2}]")]
+    ParsingUnexpectedRule(String, usize, usize),
 
-    #[error("Parsing Error: rule not found - {0}")]
+    #[error("Parsing Error: rule not found - {0} (this is probably a bug)")]
     ParsingRuleNotFound(String),
 
-    #[error("Parsing Error: anonymous processes not allowed on rhs")]
-    ParsingAnonymousProcess(),
+    #[error("Parsing Error: anonymous processes are not allowed on the rhs of a specification [{0}:{1}]")]
+    ParsingAnonymousProcess(usize, usize),
 
     #[error("Syntax Error:\n{0}")]
     SyntaxError(Box<pest::error::Error<parser::Rule>>),
@@ -31,16 +31,18 @@ pub enum CCSError {
 }
 
 impl CCSError {
-    pub fn parsing_unexpected_rule(rule: parser::Rule) -> Self {
-        CCSError::ParsingUnexpectedRule(format!("{:?}", rule))
+    pub fn parsing_unexpected_rule(rule: parser::Rule, span: &pest::Span) -> Self {
+        let pos = span.start_pos().line_col();
+        CCSError::ParsingUnexpectedRule(format!("{:?}", rule), pos.0, pos.1)
     }
 
     pub fn parsing_rule_not_found(rule: parser::Rule) -> Self {
         CCSError::ParsingRuleNotFound(format!("{:?}", rule))
     }
 
-    pub fn parsing_anonymous_process() -> Self {
-        CCSError::ParsingAnonymousProcess()
+    pub fn parsing_anonymous_process(span: &pest::Span) -> Self {
+        let pos = span.start_pos().line_col();
+        CCSError::ParsingAnonymousProcess(pos.0, pos.1)
     }
 
     pub fn child_creation(name: String) -> Self {

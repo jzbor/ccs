@@ -59,31 +59,31 @@ fn parse_process(pair: Pair<Rule>) -> CCSResult<Process> {
         Rule::process_name => {
             let name: Rc<_> = pair.as_span().as_str().to_owned().into();
             if *name == "_" {
-                Err(CCSError::parsing_anonymous_process())
+                Err(CCSError::parsing_anonymous_process(&pair.as_span()))
             } else {
                 Ok(Process::ProcessName(name))
             }
         },
-        _ => Err(CCSError::parsing_unexpected_rule(pair.as_rule())),
+        _ => Err(CCSError::parsing_unexpected_rule(pair.as_rule(), &pair.as_span())),
     }
 }
 
 fn parse_specification(pair: Pair<Rule>) -> CCSResult<(ProcessName, Process)> {
     if pair.as_rule() != Rule::specification {
-        return Err(CCSError::parsing_unexpected_rule(pair.as_rule()));
+        return Err(CCSError::parsing_unexpected_rule(pair.as_rule(), &pair.as_span()));
     }
 
     let mut inner = pair.into_inner();
 
     let name_pair = inner.next().ok_or(CCSError::parsing_rule_not_found(Rule::process_name))?;
-    if name_pair.as_rule() != Rule::process_name {
-        return Err(CCSError::parsing_unexpected_rule(name_pair.as_rule()));
+    if name_pair.as_rule() != Rule::process_name  && name_pair.as_rule() != Rule::anonymous_process_name {
+        return Err(CCSError::parsing_unexpected_rule(name_pair.as_rule(), &name_pair.as_span()));
     }
     let name = name_pair.as_span().as_str().to_owned();
 
     let process_pair = inner.next().ok_or(CCSError::parsing_rule_not_found(Rule::process))?;
     if process_pair.as_rule() != Rule::process {
-        return Err(CCSError::parsing_unexpected_rule(process_pair.as_rule()));
+        return Err(CCSError::parsing_unexpected_rule(process_pair.as_rule(), &process_pair.as_span()));
     }
     let process = parse_process(process_pair)?;
 
@@ -92,7 +92,7 @@ fn parse_specification(pair: Pair<Rule>) -> CCSResult<(ProcessName, Process)> {
 
 fn parse_system(pair: Pair<Rule>, name: String) -> CCSResult<CCSSystem> {
     if pair.as_rule() != Rule::system {
-        return Err(CCSError::parsing_unexpected_rule(pair.as_rule()));
+        return Err(CCSError::parsing_unexpected_rule(pair.as_rule(), &pair.as_span()));
     }
 
     let mut processes = HashMap::new();

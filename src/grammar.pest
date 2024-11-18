@@ -1,15 +1,16 @@
-system          = { SOI ~ specification ~ ( NEWLINE+ ~ specification )* ~ NEWLINE* ~ EOI }
-specification   = { process_name ~ "=" ~ process }
-process         = { parallel | summation | restriction | process_group }
-process_group   = _{ action | deadlock | process_name | "(" ~ process ~ ")" }
-deadlock        = { "0" }
-action          = { action_name ~ "." ~ process_group }
-summation       = { process_group ~ "+" ~ process }
-parallel        = { process_group ~ "|" ~ process }
-rename          = { process ~ "[" ~ action_name ~ "/" ~ action_name ~ "]" }
-restriction     = { process_group ~ ("\\" ~ action_name)+ }
-process_name    = @{ (ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC*) | "_" }
-action_name     = @{ (ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* ~ "'"?) | "τ" }
+system                 = { SOI ~ specification ~ ( NEWLINE+ ~ specification )* ~ NEWLINE* ~ EOI }
+specification          = { (process_name | anonymous_process_name) ~ "=" ~ process }
+process                = { parallel | summation | restriction | process_group }
+process_group          = _{ action | deadlock | process_name | "(" ~ process ~ ")" }
+deadlock               = { "0" }
+action                 = { action_name ~ "." ~ process_group }
+summation              = { process_group ~ "+" ~ process }
+parallel               = { process_group ~ "|" ~ process }
+rename                 = { process ~ "[" ~ action_name ~ "/" ~ action_name ~ "]" }
+restriction            = { process_group ~ ("\\" ~ action_name)+ }
+process_name           = @{ ASCII_ALPHA_UPPER ~ ASCII_ALPHANUMERIC* }
+anonymous_process_name = @{ "_" }
+action_name            = @{ (ASCII_ALPHA_LOWER ~ ASCII_ALPHANUMERIC* ~ "'"?) | "τ" }
 
 NEWLINE      = { "\r" | "\n" }
 WHITESPACE   = _{ " " | "\t" }
