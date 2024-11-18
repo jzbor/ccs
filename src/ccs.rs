@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, fmt::Display, rc::Rc};
+use std::{collections::{HashMap, HashSet, VecDeque}, fmt::Display, rc::Rc};
 
 const TAU: &str = "τ";
 
@@ -100,6 +100,30 @@ impl Process {
     pub fn actions_complementary(a: &ActionLabel, b: &ActionLabel) -> bool {
         **a == format!("{}'", b) || **b == format!("{}'", a)
     }
+
+    fn zip_non_det_choice(&self) -> VecDeque<Self> {
+        use Process::*;
+        match self {
+            NonDetChoice(left, right) => {
+                let mut vec = right.zip_non_det_choice();
+                vec.push_front(*left.clone());
+                vec
+            }
+            _ => VecDeque::from([self.clone()]),
+        }
+    }
+
+    fn zip_parallel(&self) -> VecDeque<Self> {
+        use Process::*;
+        match self {
+            Parallel(left, right) => {
+                let mut vec = right.zip_parallel();
+                vec.push_front(*left.clone());
+                vec
+            }
+            _ => VecDeque::from([self.clone()]),
+        }
+    }
 }
 
 impl Display for Process {
@@ -109,8 +133,14 @@ impl Display for Process {
             Deadlock() => write!(f, "0"),
             ProcessName(name) => write!(f, "{}", name),
             Action(action, rest) => write!(f, "{}.{}", action, rest),
-            NonDetChoice(left, right) => write!(f, "({} + {})", left, right),
-            Parallel(left, right) => write!(f, "({} | {})", left, right),
+            NonDetChoice(..) => write!(f, "({})", self.zip_non_det_choice().into_iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(" + ")),
+            Parallel(..) => write!(f, "({})", self.zip_parallel().into_iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(" | ")),
             Rename(process, b, a) => write!(f, "{}[{}/{}]", process, b, a),
             Restriction(process, a) => write!(f, "{}\\{}", process, a),
         }
