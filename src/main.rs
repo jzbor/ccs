@@ -3,11 +3,13 @@ use std::io;
 use std::process;
 
 use ccs::CCSSystem;
+use ccs::Process;
 use clap::Parser;
 use error::CCSError;
 use error::CCSResult;
 use lts::Lts;
 
+mod bisimilarity;
 mod ccs;
 mod parser;
 mod lts;
@@ -78,6 +80,16 @@ enum Subcommand {
         #[command(flatten)]
         common: CommonArgs,
     },
+
+    /// Calculate bisimulations and decide bisimilarity
+    Bisimulation {
+        #[command(flatten)]
+        common: CommonArgs,
+
+        /// File with second CCS specification
+        #[clap()]
+        file2: String,
+    },
 }
 
 #[derive(clap::Args, Debug, PartialEq, Clone)]
@@ -97,6 +109,7 @@ impl Subcommand {
             Trace { common, .. } => common,
             States { common, .. } => common,
             Lts { common, .. } => common,
+            Bisimulation { common, .. } => common,
             SyntaxTree { common } => common,
         }
     }
@@ -191,6 +204,33 @@ fn states(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
     Ok(())
 }
 
+fn bisimulation(system1: CCSSystem, system2: CCSSystem) -> CCSResult<()> {
+    let bisimulation = bisimilarity::bisimulation(&system1, &system2);
+
+    if bisimulation.is_empty() {
+        println!("No bisimulation found");
+    } else {
+        println!("The bisimulation \"=BS=\":");
+    }
+
+    for (s, t) in &bisimulation {
+        println!("  {} \t=BS= \t{}", s, t);
+    }
+
+    println!();
+
+    let dp1 = system1.processes().get(system1.destinct_process()).unwrap();
+    let dp2 = system2.processes().get(system2.destinct_process()).unwrap();
+    let dpn1 = Process::ProcessName(system1.destinct_process().to_owned());
+    let dpn2 = Process::ProcessName(system2.destinct_process().to_owned());
+    if bisimulation.contains(&(dpn1, dpn2)) || bisimulation.contains(&(dp1.clone(), dp2.clone())) {
+        println!("Systems are bisimilar");
+    } else {
+        println!("Systems are NOT bisimilar");
+    }
+    Ok(())
+}
+
 fn syntax_tree(contents: &str) -> CCSResult<()> {
     println!("{:#?}", parser::first_pass(contents));
     Ok(())
@@ -220,6 +260,18 @@ fn main() {
         Subcommand::States { allow_duplicates, .. } => states(system, allow_duplicates),
         Subcommand::SyntaxTree {..} => Ok(()),
         Subcommand::Trace { allow_duplicates, .. } => trace(system, allow_duplicates),
+        Subcommand::Bisimulation { file2, .. } => {
+            let contents = error::resolve(
+                fs::read_to_string(&file2)
+                    .map_err(CCSError::file_error)
+            );
+            let system2 = match parser::parse(file2, &contents) {
+                Ok(system) => system,
+                Err(e) => {eprintln!("{}", e); process::exit(1) },
+            };
+
+            bisimulation(system, system2)
+        },
     };
 
     error::resolve(result);
