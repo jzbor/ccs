@@ -82,7 +82,7 @@ enum Subcommand {
     },
 
     /// Calculate bisimulations and decide bisimilarity
-    Bisimulation {
+    Bisimilarity {
         #[command(flatten)]
         common: CommonArgs,
 
@@ -109,7 +109,7 @@ impl Subcommand {
             Trace { common, .. } => common,
             States { common, .. } => common,
             Lts { common, .. } => common,
-            Bisimulation { common, .. } => common,
+            Bisimilarity { common, .. } => common,
             SyntaxTree { common } => common,
         }
     }
@@ -136,7 +136,7 @@ fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool, allow
 
     if graph {
         if let Some(compare_lts) = &compare_lts_opt {
-            Lts::visualize_all(&[&lts, &compare_lts], &mut io::stdout())?;
+            Lts::visualize_all(&[&lts, compare_lts], &mut io::stdout())?;
         } else {
             lts.visualize(&mut io::stdout())?;
         }
@@ -152,7 +152,7 @@ fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool, allow
             .map_err(|_| CCSError::child_creation("dot".to_string()))?;
 
         if let Some(compare_lts) = &compare_lts_opt {
-            Lts::visualize_all(&[&lts, &compare_lts], &mut cmd.stdin.take().unwrap())?;
+            Lts::visualize_all(&[&lts, compare_lts], &mut cmd.stdin.take().unwrap())?;
         } else {
             lts.visualize(&mut cmd.stdin.take().unwrap())?;
         }
@@ -204,7 +204,7 @@ fn states(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
     Ok(())
 }
 
-fn bisimulation(system1: CCSSystem, system2: CCSSystem) -> CCSResult<()> {
+fn bisimilarity(system1: CCSSystem, system2: CCSSystem) -> CCSResult<()> {
     let bisimulation = bisimilarity::bisimulation(&system1, &system2);
 
     if bisimulation.is_empty() {
@@ -260,7 +260,7 @@ fn main() {
         Subcommand::States { allow_duplicates, .. } => states(system, allow_duplicates),
         Subcommand::SyntaxTree {..} => Ok(()),
         Subcommand::Trace { allow_duplicates, .. } => trace(system, allow_duplicates),
-        Subcommand::Bisimulation { file2, .. } => {
+        Subcommand::Bisimilarity { file2, .. } => {
             let contents = error::resolve(
                 fs::read_to_string(&file2)
                     .map_err(CCSError::file_error)
@@ -270,7 +270,7 @@ fn main() {
                 Err(e) => {eprintln!("{}", e); process::exit(1) },
             };
 
-            bisimulation(system, system2)
+            bisimilarity(system, system2)
         },
     };
 
