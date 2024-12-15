@@ -9,7 +9,7 @@ jobs:
     with:
       magic-cache: true
       # binary-cache: false
-      # architectures: '["x86_64-linux", "aarch64-linux"]'
+      architectures: '["x86_64-linux", "aarch64-linux"]'
     secrets:
       ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
       ATTIC_CACHE: ${{ secrets.ATTIC_CACHE }}
