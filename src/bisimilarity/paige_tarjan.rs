@@ -1,3 +1,7 @@
+//! Implementation of the [Paige-Tarjan algorithm](https://doi.org/10.1137%2F0216062).
+//!
+//! * [Reference (German)](https://www8.cs.fau.de/ext/teaching/wise2024-25/CommPar/CommPar.pdf#subsection.2.7)
+
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::ops::Deref;
@@ -5,39 +9,87 @@ use std::rc::{Rc, Weak};
 
 use super::list::*;
 
+/// State of the algorithm
 pub struct PaigeTarjan {
+    /// List of composed blocks.
+    /// Linked by [`Block::c_ref`]
     c_blocks: RcList<Block>,
+
+    /// Coarse partition R
+    /// Linked by [`Block::r_ref`]
     r_blocks: RcList<Block>,
 }
 
+/// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
 pub struct State {
+    /// List of all transitions _into_ this state.
+    /// Linked by [`Transition::list_ref`].
     in_transitions: RcList<Transition>,
+
+    /// Mark used to avoid duplicates in the third step
     mark: bool,
+
+    /// Counter
     count: usize,
+
+    /// Block in P that this state is a part of
     block_in_p: Weak<RefCell<Block>>,
 
+
+    /// Links for list of predecessors
     pred_ref: ListRef<Self>,
+
+    /// Links for [`Block::elements`]
     element_ref: ListRef<Self>,
+
+    /// Links for [`Block::elements`]; Only used by the copied block B'.
     element_copy_ref: ListRef<Self>,
 }
 
+/// A transition in the underlying LTS
 pub struct Transition {
+    /// Link to the [`State`] where the transition originates from.
     lhs: Weak<RefCell<State>>,
+
+    /// Mark used to avoid duplicates in the third step
+    mark: bool,
+
+    /// Links for [`State::in_transitions`].
+    list_ref: ListRef<Self>
 }
 
-type RcBlock = Rc<RefCell<Block>>;
-
+/// A block of a partition.
+///
+/// One [`Block`] may be part of multiple partitions (see it's parameters).
 pub struct Block {
+    /// List of all [`State`]s contained in the block.
+    /// Linked by [`State::element_ref`] or [`State::element_copy_ref`] depending on whether this
+    /// is a copy block as created by [`Block::new_as_copy`].
     elements: RcList<State>,
+
+    /// List of all blocks contained in this one (if the block is a composed block).
+    /// Linked by [`Block::child_ref`]
     children: RcList<Block>,
+
+    /// Attached block used in the [`PaigeTarjan::split`] step.
     attached: Option<Rc<RefCell<Block>>>,
 
+
+    /// Links for [`PaigeTarjan::c_blocks`]
     c_ref: ListRef<Block>,
+
+    /// Links for [`PaigeTarjan::r_blocks`]
+    r_ref: ListRef<Block>,
+
+    /// Links for split blocks list used in [`PaigeTarjan::split`]
     split_ref: ListRef<Block>,
+
+    /// Links for [`Block::children`]
     child_ref: ListRef<Block>,
 }
 
 impl PaigeTarjan {
+    /// Refine step of the Paige-Tarjan algorithm
     fn refine(&mut self) {
         // 1. Select Divider
         let divider = self.c_blocks.pop_front().unwrap();
@@ -68,12 +120,14 @@ impl PaigeTarjan {
                 lhs.deref().borrow_mut().mark = true;
                 lhs.deref().borrow_mut().count += 1;
                 pred_b.append(lhs);
+                // TODO mark transition?
             }
         }
 
         // 4.
     }
 
+    /// Split blocks by `divider`.
     fn split(&mut self, divider: Rc<RefCell<Block>>, pred_b: RcList<State>) {
         let mut splitblocks = RcList::new(Block::split_list_ref, Block::split_list_ref_mut);
         for s in pred_b.iter() {
@@ -106,6 +160,7 @@ impl PaigeTarjan {
 }
 
 impl Block {
+    /// Create new, empty [`Block`]
     fn new() -> Self {
         Block {
             elements: RcList::new(State::element_list_ref, State::element_list_ref_mut),
@@ -113,11 +168,13 @@ impl Block {
             attached: None,
 
             c_ref: ListRef::new(),
+            r_ref: ListRef::new(),
             split_ref: ListRef::new(),
             child_ref: ListRef::new(),
         }
     }
 
+    /// Create new [`Block`], which is set up to serve as a copy
     fn new_as_copy() -> Self {
         Block {
             elements: RcList::new(State::element_copy_list_ref, State::element_copy_list_ref_mut),
@@ -125,6 +182,7 @@ impl Block {
             attached: None,
 
             c_ref: ListRef::new(),
+            r_ref: ListRef::new(),
             split_ref: ListRef::new(),
             child_ref: ListRef::new(),
         }
@@ -136,12 +194,6 @@ impl Block {
             new.children.append(block.clone())
         }
         // TODO do we need elements here?
-        new
-    }
-
-    fn new_copy_states(other: &Self) -> Self {
-        let mut new = Self::new();
-        new.elements = other.elements.clone(); // TODO: This is a problem!
         new
     }
 
@@ -190,6 +242,6 @@ impl State {
 
 impl Transition {
     fn is_marked(&self) -> bool {
-        todo!()
+        self.mark
     }
 }
