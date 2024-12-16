@@ -1,106 +1,174 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{borrow::BorrowMut, cell::RefCell, ops::Deref, rc::Rc};
 
-pub struct ListItem<T> {
-    previous: Option<RcItem<T>>,
-    next: Option<RcItem<T>>,
-    data: T,
+#[derive(Clone)]
+pub struct ListRef<T> {
+    next: Option<Rc<RefCell<T>>>,
+    prev: Option<Rc<RefCell<T>>>,
 }
 
-pub type RcItem<T> = Rc<RefCell<ListItem<T>>>;
+type GetRef<T> = fn(&T) -> &ListRef<T>;
+type GetRefMut<T> = fn(&mut T) -> &mut ListRef<T>;
 
 pub struct RcList<T> {
-    first: Option<RcItem<T>>,
-    last: Option<RcItem<T>>,
-    size: usize
+    head: Option<Rc<RefCell<T>>>,
+    tail: Option<Rc<RefCell<T>>>,
+    get_ref: GetRef<T>,
+    get_ref_mut: GetRefMut<T>,
+    size: usize,
 }
 
 pub struct RcListIterator<T> {
-    current: Option<RcItem<T>>,
+    current: Option<Rc<RefCell<T>>>,
+    get_ref: GetRef<T>,
 }
 
 impl<T> RcList<T> {
-    pub fn new() -> Self {
-        RcList {
-            first: None,
-            last: None,
-            size: 0,
+    pub fn new(get_ref: GetRef<T>, get_ref_mut: GetRefMut<T>) -> Self {
+        RcList { head: None, tail: None, size: 0, get_ref, get_ref_mut }
+    }
+
+    fn set_next(&self, e: Rc<RefCell<T>>, next: Option<Rc<RefCell<T>>>) {
+        let mut mut_e = e.deref().borrow_mut();
+        let e_ref = (self.get_ref_mut)(&mut mut_e);
+        e_ref.next = next;
+    }
+
+    fn set_prev(&self, e: Rc<RefCell<T>>, prev: Option<Rc<RefCell<T>>>) {
+        let mut mut_e = e.deref().borrow_mut();
+        let e_ref = (self.get_ref_mut)(&mut mut_e);
+        e_ref.prev = prev;
+    }
+
+    fn take_next(&self, e: Rc<RefCell<T>>) -> Option<Rc<RefCell<T>>> {
+        let mut mut_e = e.deref().borrow_mut();
+        let e_ref = (self.get_ref_mut)(&mut mut_e);
+        e_ref.next.take()
+    }
+
+    fn take_prev(&self, e: Rc<RefCell<T>>) -> Option<Rc<RefCell<T>>> {
+        let mut mut_e = e.deref().borrow_mut();
+        let e_ref = (self.get_ref_mut)(&mut mut_e);
+        e_ref.prev.take()
+    }
+
+    fn get_next(&self, e: Rc<RefCell<T>>) -> Option<Rc<RefCell<T>>> {
+        let borrow_e = e.deref().borrow();
+        let e_ref = (self.get_ref)(&borrow_e);
+        e_ref.next.clone()
+    }
+
+    fn get_prev(&self, e: Rc<RefCell<T>>) -> Option<Rc<RefCell<T>>> {
+        let borrow_e = e.deref().borrow();
+        let e_ref = (self.get_ref)(&borrow_e);
+        e_ref.prev.clone()
+    }
+
+    pub fn append(&mut self, e: Rc<RefCell<T>>) {
+        let prev_tail = self.tail.take();
+        self.tail = Some(e.clone());
+        if prev_tail.is_none() {
+            self.head = Some(e.clone());
         }
+        self.set_next(e.clone(), None);
+        self.set_prev(e, prev_tail);
+        self.size += 1;
+    }
+
+    pub fn append_new(&mut self, e: T) {
+        self.append(Rc::new(RefCell::new(e)))
+    }
+
+    pub fn remove(&mut self, e: Rc<RefCell<T>>) -> Rc<RefCell<T>> {
+        let next_opt = self.take_next(e.clone());
+        let prev_opt = self.take_prev(e.clone());
+
+        match next_opt {
+            Some(next) => match prev_opt {
+                Some(prev) => {
+                    self.set_next(prev.clone(), Some(next.clone()));
+                    self.set_prev(next, Some(prev));
+                },
+                None => {
+                    self.head = Some(next.clone());
+                    self.set_prev(next, None);
+                },
+            },
+            None => match prev_opt {
+                Some(prev) => {
+                    self.tail = Some(prev.clone());
+                    self.set_next(prev, None);
+                },
+                None => {
+                    self.tail = None;
+                    self.head = None;
+                },
+            }
+        }
+
+        self.size -= 1;
+        e
+    }
+
+    pub fn get(&mut self, i: usize) -> Option<Rc<RefCell<T>>> {
+        let mut elem = self.head.clone();
+        for _ in 0..i {
+            elem = elem.map(|e| self.get_next(e)).flatten();
+        }
+        elem
+    }
+
+    pub fn pop_front(&mut self) -> Option<Rc<RefCell<T>>> {
+        let front = self.peek_front();
+        front.map(|f| { self.remove(f.clone()); f })
+    }
+
+    pub fn peek_front(&mut self) -> Option<Rc<RefCell<T>>> {
+        self.head.clone()
+    }
+
+    pub fn iter(&self) -> RcListIterator<T> {
+        RcListIterator { current: self.head.clone(), get_ref: self.get_ref }
     }
 
     pub fn len(&self) -> usize {
         self.size
     }
 
-    pub fn put(&mut self, data: T) {
-        let previous_last = self.last.take();
-        let item = Rc::new(RefCell::new(ListItem {
-            previous: previous_last,
-            next: None,
-            data
-        }));
-        self.size += 1;
-        self.last = Some(item);
-    }
-
-    pub fn remove(&mut self, item: RcItem<T>) -> T {
-        let mut item_ref = item.borrow_mut();
-        let previous_opt = item_ref.previous.take();
-        let next_opt = item_ref.next.take();
-        drop(item_ref);
-        if let Some(previous) = &previous_opt {
-            previous.borrow_mut().next = next_opt.clone();
-        }
-        if let Some(next) = &next_opt {
-            next.borrow_mut().previous = previous_opt;
-        }
-
-        self.size -= 1;
-
-        Rc::into_inner(item).unwrap()
-            .into_inner().data
-    }
-
-    pub fn pop_front(&mut self) -> Option<T> {
-        todo!()
-    }
-
-    pub fn get(&mut self, i: usize) -> Option<RcItem<T>> {
-        todo!()
-    }
-
-    pub fn iter(&self) -> RcListIterator<T> {
-        RcListIterator { current: self.first.clone() }
+    pub fn empty(&self) -> bool {
+        self.size == 0
     }
 }
 
-impl<T> ListItem<T> {
-    pub fn data(&self) -> &T {
-        &self.data
-    }
-
-    pub fn data_mut(&mut self) -> &mut T {
-        &mut self.data
+impl<T> ListRef<T> {
+    pub fn new() -> Self {
+        ListRef {
+            next: None,
+            prev: None,
+        }
     }
 }
 
 impl<T> Iterator for RcListIterator<T> {
-    type Item = RcItem<T>;
+    type Item = Rc<RefCell<T>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.current.take() {
             Some(current) => {
-                self.current = current.borrow().next.clone();
+                let mut cur_borrow = current.deref().borrow_mut();
+                let cur_ref = (self.get_ref)(&mut cur_borrow);
+                self.current = cur_ref.next.clone();
+                drop(cur_borrow);
                 Some(current)
             },
-            None => None,
+            None => todo!(),
         }
     }
 }
 
 impl<T> Clone for RcList<T> {
     fn clone(&self) -> Self {
-        // TODO: deep copy
         todo!()
     }
 }
+
+
