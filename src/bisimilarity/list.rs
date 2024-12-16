@@ -54,12 +54,33 @@ impl<T> RcList<T> {
         if let Some(next) = &next_opt {
             next.borrow_mut().previous = previous_opt;
         }
+
+        self.size -= 1;
+
         Rc::into_inner(item).unwrap()
             .into_inner().data
     }
 
+    pub fn pop_front(&mut self) -> Option<T> {
+        todo!()
+    }
+
+    pub fn get(&mut self, i: usize) -> Option<RcItem<T>> {
+        todo!()
+    }
+
     pub fn iter(&self) -> RcListIterator<T> {
         RcListIterator { current: self.first.clone() }
+    }
+}
+
+impl<T> ListItem<T> {
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut T {
+        &mut self.data
     }
 }
 
@@ -74,5 +95,12 @@ impl<T> Iterator for RcListIterator<T> {
             },
             None => None,
         }
+    }
+}
+
+impl<T> Clone for RcList<T> {
+    fn clone(&self) -> Self {
+        // TODO: deep copy
+        todo!()
     }
 }

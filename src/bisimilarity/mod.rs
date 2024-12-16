@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::ccs::*;
 
 mod fixpoint;
+mod paige_tarjan;
 mod list;
 
 pub type Relation = HashSet<(Process, Process)>;
