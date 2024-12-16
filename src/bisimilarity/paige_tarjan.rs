@@ -18,6 +18,10 @@ pub struct PaigeTarjan {
     /// Coarse partition R
     /// Linked by [`Block::r_ref`]
     r_blocks: RcList<Block>,
+
+    /// Fine partition P
+    /// Linked by [`Block::p_ref`]
+    p_blocks: RcList<Block>,
 }
 
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
@@ -27,10 +31,13 @@ pub struct State {
     in_transitions: RcList<Transition>,
 
     /// Mark used to avoid duplicates in the third step
-    mark: bool,
+    mark3: bool,
 
-    /// Counter
-    count: usize,
+    /// Mark used to avoid duplicates in the fifth step
+    mark5: bool,
+
+    /// count(s, B)
+    count: Rc<RefCell<usize>>,
 
     /// Block in P that this state is a part of
     block_in_p: Weak<RefCell<Block>>,
@@ -38,6 +45,9 @@ pub struct State {
 
     /// Links for list of predecessors
     pred_ref: ListRef<Self>,
+
+    /// Links for list of limited predecessors
+    limpred_ref: ListRef<Self>,
 
     /// Links for [`Block::elements`]
     element_ref: ListRef<Self>,
@@ -53,6 +63,9 @@ pub struct Transition {
 
     /// Mark used to avoid duplicates in the third step
     mark: bool,
+
+    /// count(s, S)
+    count: Rc<RefCell<usize>>,
 
     /// Links for [`State::in_transitions`].
     list_ref: ListRef<Self>
@@ -81,6 +94,9 @@ pub struct Block {
     /// Links for [`PaigeTarjan::r_blocks`]
     r_ref: ListRef<Block>,
 
+    /// Links for [`PaigeTarjan::p_blocks`]
+    p_ref: ListRef<Block>,
+
     /// Links for split blocks list used in [`PaigeTarjan::split`]
     split_ref: ListRef<Block>,
 
@@ -101,10 +117,10 @@ impl PaigeTarjan {
 
         // 2. Update R
         let b = divider.deref().borrow_mut().children.remove(smaller);
-        let s_prime = Block::new_containing(&[b.clone()]);
-        self.r_blocks.append_new(s_prime);
+        let s_prime = Rc::new(RefCell::new(Block::new_containing(&[b.clone()])));
+        self.r_blocks.append(s_prime.clone());
         if (*divider).borrow().children.len() > 1 {
-            self.c_blocks.append(divider);
+            self.c_blocks.append(divider.clone());
         }
 
         // 3. Calculate Predecessors of B
@@ -114,24 +130,63 @@ impl PaigeTarjan {
         }
         let mut pred_b = RcList::new(State::pred_list_ref, State::pred_list_ref_mut);
         for s_small_prime in (*b).borrow().elements.iter() {
-            for trans in s_small_prime.deref().borrow().in_transitions.iter()
-                    .filter(|trans| !trans.deref().borrow().is_marked()){
-                let lhs = trans.deref().borrow().lhs.clone().upgrade().unwrap();
-                lhs.deref().borrow_mut().mark = true;
-                lhs.deref().borrow_mut().count += 1;
-                pred_b.append(lhs);
-                // TODO mark transition?
+            for trans in s_small_prime.deref().borrow().in_transitions.iter() {
+                let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
+                let mut lhs = lhs_rc.deref().borrow_mut();
+                if lhs.mark3 {
+                    continue;
+                }
+                lhs.mark3 = true;
+                *lhs.count.deref().borrow_mut() += 1;
+                drop(lhs);
+                pred_b.append(lhs_rc);
             }
         }
 
-        // 4.
+        // 4. Calculate P' = split(B, P)
+        self.split(divider.clone(), pred_b, s_prime.clone());
+
+        // 5. Calculate <-[B]\<-[S\B]
+        let mut limited_pred_b = RcList::new(State::limpred_list_ref, State::limpred_list_ref_mut);
+        for s_small_prime in b_prime.elements.iter() {
+            for trans in s_small_prime.deref().borrow().in_transitions.iter() {
+                let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
+                let mut lhs = lhs_rc.deref().borrow_mut();
+                let trans_count = *trans.deref().borrow().count.deref().borrow();
+                let lhs_count = *lhs.count.deref().borrow();
+
+                // TODO: Wo wird trans_count gesetzt?
+                if lhs_count == trans_count && !lhs.mark5 {
+                    lhs.mark5 = true;
+                    drop(lhs);
+                    limited_pred_b.append(lhs_rc)
+                }
+            }
+        }
+
+
+        // 6. Calculate split(S\B, P')
+        // TODO: do we need a fresh s_prime?
+        self.split(divider, limited_pred_b, s_prime);
+
+        // 7. Update counter
+        for s_small_prime in b_prime.elements.iter() {
+            for trans_rc in s_small_prime.deref().borrow().in_transitions.iter() {
+                let mut trans = trans_rc.deref().borrow_mut();
+                if *trans.count.deref().borrow() > 0 {
+                    *trans.count.deref().borrow_mut() -= 1;
+                }
+                trans.count = trans.lhs.upgrade().unwrap().deref().borrow().count.clone();
+            }
+        }
+        // TODO cleanup markers
     }
 
     /// Split blocks by `divider`.
-    fn split(&mut self, divider: Rc<RefCell<Block>>, pred_b: RcList<State>) {
+    fn split(&mut self, divider: Rc<RefCell<Block>>, pred_b: RcList<State>, s_prime: Rc<RefCell<Block>>) {
         let mut splitblocks = RcList::new(Block::split_list_ref, Block::split_list_ref_mut);
-        for s in pred_b.iter() {
-            let d = s.deref().borrow().block_in_p
+        for s_small in pred_b.iter() {
+            let d = s_small.deref().borrow().block_in_p
                 .upgrade().unwrap().clone();
 
             if d.deref().borrow().attached.is_none() {
@@ -140,20 +195,18 @@ impl PaigeTarjan {
             }
 
             let d_prime = d.deref().borrow().attached.clone().unwrap();
-            let s_small = d.deref().borrow_mut().elements.remove(s);
+            let s_small = d.deref().borrow_mut().elements.remove(s_small);
             d_prime.deref().borrow_mut().elements.append(s_small);
 
             divider.deref().borrow_mut().children.append(d_prime);
             splitblocks.append(d);
         }
         for d in splitblocks.iter() {
-            let d_prime = d.deref().borrow_mut().attached.take();
-            if d.deref().borrow().elements.len() == 0 {
-                //   v TODO: r or p?
-                self.r_blocks.remove(d.clone());
-                // TODO: delete from upper block?
-            } else {
-                // TODO take s' in R s.t. D sub S'
+            d.deref().borrow_mut().attached = None;
+            if d.deref().borrow().elements.empty() {
+                self.p_blocks.remove(d.clone());
+            } else if s_prime.deref().borrow().children.len() == 2 {
+                self.c_blocks.append(s_prime.clone())
             }
         }
     }
@@ -169,6 +222,7 @@ impl Block {
 
             c_ref: ListRef::new(),
             r_ref: ListRef::new(),
+            p_ref: ListRef::new(),
             split_ref: ListRef::new(),
             child_ref: ListRef::new(),
         }
@@ -183,6 +237,7 @@ impl Block {
 
             c_ref: ListRef::new(),
             r_ref: ListRef::new(),
+            p_ref: ListRef::new(),
             split_ref: ListRef::new(),
             child_ref: ListRef::new(),
         }
@@ -221,6 +276,14 @@ impl State {
 
     fn pred_list_ref_mut(&mut self) -> &mut ListRef<State> {
         &mut self.borrow_mut().pred_ref
+    }
+
+    fn limpred_list_ref(&self) -> &ListRef<State> {
+        &self.borrow().limpred_ref
+    }
+
+    fn limpred_list_ref_mut(&mut self) -> &mut ListRef<State> {
+        &mut self.borrow_mut().limpred_ref
     }
 
     fn element_list_ref(&self) -> &ListRef<State> {
