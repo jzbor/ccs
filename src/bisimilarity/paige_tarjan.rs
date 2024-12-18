@@ -5,6 +5,7 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
@@ -193,6 +194,8 @@ impl PaigeTarjan {
         let size2 = child2.deref().borrow().elements.len();
         let smaller = if size1 < size2 { child1 } else { child2 };
 
+        println!("Smaller block from divider: {:?}",smaller.deref().borrow());
+
         // 2. Update R
         let b = divider.deref().borrow_mut().children.remove(smaller);
         let s_prime = Rc::new(RefCell::new(Block::new_containing(b.clone())));
@@ -213,11 +216,13 @@ impl PaigeTarjan {
             for trans in s_small_prime.deref().borrow().in_transitions.iter() {
                 let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
                 let lhs = lhs_rc.deref().borrow();
+
+                *lhs.count.deref().borrow_mut() += 1;
+
                 if *lhs.mark3.borrow() {
                     continue;
                 }
                 *lhs.mark3.borrow_mut() = true;
-                *lhs.count.deref().borrow_mut() += 1;
                 drop(lhs);
                 preds.push(lhs_rc);
             }
@@ -264,6 +269,9 @@ impl PaigeTarjan {
             state.mark3 = RefCell::new(false);
             state.mark5 = RefCell::new(false);
         }
+
+        //delete B'
+        //drop(b_prime);
     }
 
     /// Split blocks by `divider`.
@@ -355,9 +363,10 @@ impl Block {
         let mut new = Self::new();
         new.children.append(block.clone());
 
-        for state in block.deref().borrow().elements.iter() {
-            new.elements.append(state);
-        }
+        //todo nur P-Blocke haben doch Zustaende?
+        // for state in block.deref().borrow().elements.iter() {
+        //     new.elements.append(state);
+        // }
         new
     }
 
@@ -399,6 +408,26 @@ impl Block {
 
     fn p_list_ref_mut(&mut self) -> &mut ListRef<Block> {
         &mut self.borrow_mut().p_ref
+    }
+}
+
+impl Debug for Block {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+
+        if self.elements.empty() {
+            for b in self.children.iter() {
+                for e in b.deref().borrow().elements.iter() {
+                    write!(f, "{:?} ", e.deref().borrow())?;
+                }
+            }
+        } else {
+            for e in self.elements.iter() {
+                write!(f, "{:?}, ", e.deref().borrow())?;
+            }
+        }
+
+        write!(f, "}}")
     }
 }
 
@@ -461,6 +490,12 @@ impl State {
     }
 }
 
+impl Debug for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.process)
+    }
+}
+
 impl Transition {
     fn new(desc: lts::Transition, lhs: Weak<RefCell<State>>) -> Self {
         Transition {
@@ -496,8 +531,15 @@ pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
     let starting = Instant::now();
 
     while !pt.finished() {
+        println!("R={:?}", pt.r_blocks);
+        println!("P={:?}", pt.p_blocks);
+        println!("C={:?}\n", pt.c_blocks);
         pt.refine();
     }
+
+    println!("R={:?}", pt.r_blocks);
+    println!("P={:?}", pt.p_blocks);
+
 
     let mut rel = Relation::new();
     for block in pt.p_blocks.iter() {

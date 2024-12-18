@@ -257,6 +257,13 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, comp
         println!("=== NAIVE FIXPOINT ===");
         println!("took: {:?}\t", duration_nf);
         println!("size of bisimulation: {:?}\n", bisimulation_nf.len());
+
+        let bisims_equal = bisimulation_pt.is_subset(&bisimulation_nf) && bisimulation_nf.is_subset(&bisimulation_pt);
+        if bisims_equal {
+            println!("bisimulations are equal");
+        } else {
+            println!("bisimulations differ.")
+        }
     } else {
         let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
 

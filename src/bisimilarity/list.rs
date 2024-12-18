@@ -1,4 +1,5 @@
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, fmt, ops::Deref, rc::Rc};
+use std::fmt::Debug;
 
 #[derive(Clone)]
 pub struct ListRef<T> {
@@ -140,6 +141,18 @@ impl<T> RcList<T> {
 
     pub fn empty(&self) -> bool {
         self.size == 0
+    }
+}
+
+impl<T: Debug> Debug for RcList<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[")?;
+
+        for e in self.iter() {
+            write!(f, "{:?}, ", e.deref().borrow())?;
+        }
+
+        write!(f, "]")
     }
 }
 
