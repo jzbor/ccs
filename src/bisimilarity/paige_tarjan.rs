@@ -128,7 +128,8 @@ impl PaigeTarjan {
 
         // 2. Update R
         let b = divider.deref().borrow_mut().children.remove(smaller);
-        let s_prime = Rc::new(RefCell::new(Block::new_containing(&[b.clone()])));
+        let s_prime = Rc::new(RefCell::new(Block::new_containing(b.clone())));
+        b.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&s_prime));
         self.r_blocks.append(s_prime.clone());
         if (*divider).borrow().children.len() > 1 {
             self.c_blocks.append(divider.clone());
@@ -264,12 +265,13 @@ impl Block {
         }
     }
 
-    fn new_containing(blocks: &[Rc<RefCell<Block>>]) -> Self {
+    fn new_containing(block: Rc<RefCell<Block>>) -> Self {
         let mut new = Self::new();
-        for block in blocks {
-            new.children.append(block.clone())
+        new.children.append(block.clone());
+
+        for state in block.deref().borrow().elements.iter() {
+            new.elements.append(state);
         }
-        // TODO do we need elements here?
         new
     }
 
