@@ -160,15 +160,7 @@ impl<T> Iterator for RcListIterator<T> {
                 drop(cur_borrow);
                 Some(current)
             },
-            None => todo!(),
+            None => None,
         }
     }
 }
-
-impl<T> Clone for RcList<T> {
-    fn clone(&self) -> Self {
-        todo!()
-    }
-}
-
-

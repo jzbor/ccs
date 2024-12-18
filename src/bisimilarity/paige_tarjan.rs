@@ -4,10 +4,13 @@
 
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
-use super::list::*;
+use crate::lts::{self, Lts};
+
+use super::{list::*, Process};
 
 /// State of the algorithm
 pub struct PaigeTarjan {
@@ -32,9 +35,15 @@ pub struct PaigeTarjan {
 
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
 pub struct State {
+    /// Process that is represented by this state
+    process: Process,
+
     /// List of all transitions _into_ this state.
     /// Linked by [`Transition::list_ref`].
     in_transitions: RcList<Transition>,
+
+    /// true if this state has no outgoing transitions
+    is_deadlock: bool,
 
     /// Mark used to avoid duplicates in the third step
     mark3: bool,
@@ -66,6 +75,9 @@ pub struct State {
 
 /// A transition in the underlying LTS
 pub struct Transition {
+    /// Description of the corresponding CCS transition
+    desc: lts::Transition,
+
     /// Link to the [`State`] where the transition originates from.
     lhs: Weak<RefCell<State>>,
 
@@ -116,6 +128,60 @@ pub struct Block {
 }
 
 impl PaigeTarjan {
+    fn new(lts: Lts) -> Self {
+        let mut states: HashMap<_, _> = lts.states(false)
+            .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
+            .collect();
+        let lts_transitions = lts.transitions(false);
+        let mut all_transitions = RcList::new(Transition::all_list_ref, Transition::all_list_ref_mut);
+
+        for (from, label, to) in lts_transitions {
+            let lhs = states.get(&from).unwrap();
+            lhs.deref().borrow_mut().is_deadlock = false;
+            let trans = Rc::new(RefCell::new(Transition::new((from, label, to.clone()), Rc::downgrade(lhs))));
+            states.get_mut(&to).unwrap().deref().deref().borrow_mut().in_transitions.append(trans.clone());
+            all_transitions.append(trans);
+        }
+
+        let mut all_states = RcList::new(State::all_list_ref, State::all_list_ref_mut);
+        for state in states.into_values() {
+            all_states.append(state)
+        }
+
+        let mut c_blocks = RcList::new(Block::c_list_ref, Block::c_list_ref_mut);
+        let mut q = Block::new();
+        for state in all_states.iter() {
+            q.elements.append(state)
+        }
+        c_blocks.append_new(q);
+
+        let mut r_blocks = RcList::new(Block::r_list_ref, Block::r_list_ref_mut);
+        r_blocks.append(c_blocks.get(0).unwrap());
+
+        let dead_block = Rc::new(RefCell::new(Block::new()));
+        let alive_block = Rc::new(RefCell::new(Block::new()));
+        for state in all_states.iter() {
+            if state.deref().borrow().is_deadlock {
+                state.deref().borrow_mut().block_in_p = Rc::downgrade(&dead_block);
+                dead_block.deref().borrow_mut().elements.append(state)
+            } else {
+                state.deref().borrow_mut().block_in_p = Rc::downgrade(&alive_block);
+                alive_block.deref().borrow_mut().elements.append(state)
+            }
+        }
+        let mut p_blocks = RcList::new(Block::p_list_ref, Block::p_list_ref_mut);
+        p_blocks.append(alive_block);
+        p_blocks.append(dead_block);
+
+        PaigeTarjan {
+            c_blocks,
+            r_blocks,
+            p_blocks,
+            states: all_states,
+            transitions: all_transitions,
+        }
+    }
+
     /// Refine step of the Paige-Tarjan algorithm
     fn refine(&mut self) {
         // 1. Select Divider
@@ -198,7 +264,6 @@ impl PaigeTarjan {
 
     /// Split blocks by `divider`.
     fn split(&mut self, divider: Rc<RefCell<Block>>, pred_b: RcList<State>) {
-        // TODO update block_in_r?
         let mut splitblocks = RcList::new(Block::split_list_ref, Block::split_list_ref_mut);
         for s_small in pred_b.iter() {
             let d = s_small.deref().borrow().block_in_p
@@ -290,9 +355,50 @@ impl Block {
     fn child_list_ref_mut(&mut self) -> &mut ListRef<Block> {
         &mut self.borrow_mut().child_ref
     }
+
+    fn c_list_ref(&self) -> &ListRef<Block> {
+        &self.borrow().c_ref
+    }
+
+    fn c_list_ref_mut(&mut self) -> &mut ListRef<Block> {
+        &mut self.borrow_mut().c_ref
+    }
+
+    fn r_list_ref(&self) -> &ListRef<Block> {
+        &self.borrow().r_ref
+    }
+
+    fn r_list_ref_mut(&mut self) -> &mut ListRef<Block> {
+        &mut self.borrow_mut().r_ref
+    }
+
+    fn p_list_ref(&self) -> &ListRef<Block> {
+        &self.borrow().p_ref
+    }
+
+    fn p_list_ref_mut(&mut self) -> &mut ListRef<Block> {
+        &mut self.borrow_mut().p_ref
+    }
 }
 
 impl State {
+    fn new(process: Process) -> Self {
+        State {
+            process,
+            in_transitions: RcList::new(Transition::in_list_ref, Transition::in_list_ref_mut),
+            is_deadlock: true,
+            mark3: false,
+            mark5: false,
+            count: Rc::new(RefCell::new(0)),
+            block_in_p: Weak::new(),
+            pred_ref: ListRef::new(),
+            limpred_ref: ListRef::new(),
+            element_ref: ListRef::new(),
+            element_copy_ref: ListRef::new(),
+            all_ref: ListRef::new(),
+        }
+    }
+
     fn pred_list_ref(&self) -> &ListRef<State> {
         &self.borrow().pred_ref
     }
@@ -335,11 +441,29 @@ impl State {
 }
 
 impl Transition {
+    fn new(desc: lts::Transition, lhs: Weak<RefCell<State>>) -> Self {
+        Transition {
+            desc,
+            lhs,
+            count: Rc::new(RefCell::new(1)),
+            in_ref: ListRef::new(),
+            all_ref: ListRef::new(),
+        }
+    }
+
     fn all_list_ref(&self) -> &ListRef<Transition> {
         &self.borrow().all_ref
     }
 
     fn all_list_ref_mut(&mut self) -> &mut ListRef<Transition> {
         &mut self.borrow_mut().all_ref
+    }
+
+    fn in_list_ref(&self) -> &ListRef<Transition> {
+        &self.borrow().in_ref
+    }
+
+    fn in_list_ref_mut(&mut self) -> &mut ListRef<Transition> {
+        &mut self.borrow_mut().in_ref
     }
 }

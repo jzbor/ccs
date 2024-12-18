@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::ccs::{ActionLabel, CCSSystem, Process};
 use crate::error::CCSResult;
 
-type Transition = (Process, ActionLabel, Process);
-type Trace = Vec<ActionLabel>;
+pub type Transition = (Process, ActionLabel, Process);
+pub type Trace = Vec<ActionLabel>;
 
 pub struct Lts {
     system: CCSSystem,
