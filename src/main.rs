@@ -102,6 +102,10 @@ enum Subcommand {
         /// Don't print relation
         #[clap(short, long)]
         quiet: bool,
+
+        /// Compare algorithms
+        #[clap(short, long)]
+        algorithms: bool,
     },
 
     /// Generate a random LTS and represent it as a parsable CCS spec
@@ -233,7 +237,7 @@ fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()>
     Ok(())
 }
 
-fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool) -> CCSResult<()> {
+fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, compare_algos: bool) -> CCSResult<()> {
     let contents = error::resolve(
         fs::read_to_string(&file)
             .map_err(CCSError::file_error)
@@ -243,24 +247,36 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool) -> C
         Err(e) => {eprintln!("{}", e); process::exit(1) },
     };
 
-    let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
+    if compare_algos {
+        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true);
+        println!("=== PAIGE-TARJAN ===");
+        println!("took: {:?}\t", duration_pt);
+        println!("size of bisimulation: {:?}\n", bisimulation_pt.len());
 
-    if bisimulation.is_empty() {
-        println!("No bisimulation found");
+        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false);
+        println!("=== NAIVE FIXPOINT ===");
+        println!("took: {:?}\t", duration_nf);
+        println!("size of bisimulation: {:?}\n", bisimulation_nf.len());
     } else {
-        println!("The bisimulation \"=BS=\":");
-    }
+        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
 
-    if !quiet {
-        for (s, t) in &bisimulation {
-            println!("  {} \t=BS= \t{}", s, t);
+        if bisimulation.is_empty() {
+            println!("No bisimulation found");
+        } else {
+            println!("The bisimulation \"=BS=\":");
         }
 
-        println!();
-    }
+        if !quiet {
+            for (s, t) in &bisimulation {
+                println!("  {} \t=BS= \t{}", s, t);
+            }
 
-    if bench {
-        println!("took {:?}", duration);
+            println!();
+        }
+
+        if bench {
+            println!("took {:?}", duration);
+        }
     }
     Ok(())
 }
@@ -270,13 +286,13 @@ fn main() {
 
     use Subcommand::*;
     let result = match args.subcommand {
-        Lts { file, graph, x11, compare, allow_duplicates, .. } => lts(file, compare, graph, x11, allow_duplicates),
-        Parse { file, ..} => parse(file),
-        States { file, allow_duplicates, .. } => states(file, allow_duplicates),
-        SyntaxTree { file, .. } => syntax_tree(file),
-        Trace { file, allow_duplicates, .. } => trace(file, allow_duplicates),
+        Lts { file, graph, x11, compare, allow_duplicates } => lts(file, compare, graph, x11, allow_duplicates),
+        Parse { file } => parse(file),
+        States { file, allow_duplicates } => states(file, allow_duplicates),
+        SyntaxTree { file } => syntax_tree(file),
+        Trace { file, allow_duplicates } => trace(file, allow_duplicates),
         RandomLts { states, actions, transitions } => random(states, actions, transitions),
-        Bisimilarity { file, paige_tarjan, bench, quiet, .. } => bisimilarity(file, paige_tarjan, bench, quiet),
+        Bisimilarity { file, paige_tarjan, bench, quiet, algorithms } => bisimilarity(file, paige_tarjan, bench, quiet, algorithms),
     };
 
     error::resolve(result);
