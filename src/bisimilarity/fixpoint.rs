@@ -16,10 +16,10 @@ fn cross_states(system1: &CCSSystem, system2: &CCSSystem) -> Relation {
     set
 }
 
-fn is_in_f(system1: &CCSSystem, system2: &CCSSystem, s: &Process, t: &Process, r: &Relation) -> bool {
+fn is_in_f(system1: &CCSSystem, s: &Process, t: &Process, r: &Relation) -> bool {
     // check s -a-> s'  ==>  t -a-> t'
     for (a, s_next) in s.direct_successors(system1) {
-        if let Some((_, t_next)) = t.direct_successors(system2).into_iter().find(|(l, _)| *l == a) {
+        if let Some((_, t_next)) = t.direct_successors(system1).into_iter().find(|(l, _)| *l == a) {
             if !r.contains(&(s_next, t_next)) {
                 return false;
             }
@@ -29,7 +29,7 @@ fn is_in_f(system1: &CCSSystem, system2: &CCSSystem, s: &Process, t: &Process, r
     }
 
     // check t -a-> t'  ==>  s -a-> s'
-    for (a, t_next) in t.direct_successors(system2) {
+    for (a, t_next) in t.direct_successors(system1) {
         if let Some((_, s_next)) = s.direct_successors(system1).into_iter().find(|(l, _)| *l == a) {
             if !r.contains(&(s_next, t_next)) {
                 return false;
@@ -42,16 +42,16 @@ fn is_in_f(system1: &CCSSystem, system2: &CCSSystem, s: &Process, t: &Process, r
     true
 }
 
-fn apply_f(system1: &CCSSystem, system2: &CCSSystem, r: Relation) -> Relation {
+fn apply_f(system1: &CCSSystem, r: Relation) -> Relation {
     r.clone().into_iter()
-        .filter(|(s, t)| is_in_f(system1, system2, s, t, &r))
+        .filter(|(s, t)| is_in_f(system1, s, t, &r))
         .collect()
 }
 
-pub fn bisimulation(system1: &CCSSystem, system2: &CCSSystem) -> Relation {
-    let mut r = cross_states(system1, system2);
-    while r != apply_f(system1, system2, r.clone()) {
-        r = apply_f(system1, system2, r.clone());
+pub fn bisimulation(system1: &CCSSystem) -> Relation {
+    let mut r = cross_states(system1, system1);
+    while r != apply_f(system1, r.clone()) {
+        r = apply_f(system1, r.clone());
     }
 
     r

@@ -4,13 +4,13 @@
 
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use crate::lts::{self, Lts};
 
-use super::{list::*, Process};
+use super::{list::*, CCSSystem, Process, Relation};
 
 /// State of the algorithm
 pub struct PaigeTarjan {
@@ -155,8 +155,9 @@ impl PaigeTarjan {
         }
         c_blocks.append_new(q);
 
+        let q = c_blocks.get(0).unwrap();
         let mut r_blocks = RcList::new(Block::r_list_ref, Block::r_list_ref_mut);
-        r_blocks.append(c_blocks.get(0).unwrap());
+        r_blocks.append(q.clone());
 
         let dead_block = Rc::new(RefCell::new(Block::new()));
         let alive_block = Rc::new(RefCell::new(Block::new()));
@@ -170,8 +171,10 @@ impl PaigeTarjan {
             }
         }
         let mut p_blocks = RcList::new(Block::p_list_ref, Block::p_list_ref_mut);
-        p_blocks.append(alive_block);
-        p_blocks.append(dead_block);
+        p_blocks.append(alive_block.clone());
+        p_blocks.append(dead_block.clone());
+        q.deref().borrow_mut().children.append(alive_block);
+        q.deref().borrow_mut().children.append(dead_block);
 
         PaigeTarjan {
             c_blocks,
@@ -241,7 +244,6 @@ impl PaigeTarjan {
             }
         }
 
-
         // 6. Calculate split(S\B, P')
         self.split(divider, limited_pred_b);
 
@@ -295,6 +297,10 @@ impl PaigeTarjan {
             }
         }
     }
+
+    fn finished(&self) -> bool {
+        self.c_blocks.empty()
+    }
 }
 
 impl Block {
@@ -312,6 +318,16 @@ impl Block {
             split_ref: ListRef::new(),
             child_ref: ListRef::new(),
         }
+    }
+
+    fn cross(&self) -> Relation {
+        let mut rel = Relation::new();
+        for a in self.elements.iter() {
+            for b in self.elements.iter() {
+                rel.insert((a.deref().borrow().process.clone(), b.deref().borrow().process.clone()));
+            }
+        }
+        rel
     }
 
     /// Create new [`Block`], which is set up to serve as a copy
@@ -466,4 +482,21 @@ impl Transition {
     fn in_list_ref_mut(&mut self) -> &mut ListRef<Transition> {
         &mut self.borrow_mut().in_ref
     }
+}
+
+
+pub fn bisimulation(system: &CCSSystem) -> Relation {
+    let lts = Lts::new(system);
+    let mut pt = PaigeTarjan::new(lts);
+
+    while !pt.finished() {
+        pt.refine();
+    }
+
+    let mut rel = Relation::new();
+    for block in pt.p_blocks.iter() {
+        rel.extend(block.deref().borrow().cross())
+    }
+
+    rel
 }

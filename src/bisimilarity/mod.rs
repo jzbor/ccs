@@ -8,6 +8,10 @@ mod list;
 
 pub type Relation = HashSet<(Process, Process)>;
 
-pub fn bisimulation(system1: &CCSSystem, system2: &CCSSystem) -> Relation {
-    fixpoint::bisimulation(system1, system2)
+pub fn bisimulation(system: &CCSSystem, paige_tarjan: bool) -> Relation {
+    if paige_tarjan {
+        paige_tarjan::bisimulation(system)
+    } else {
+        fixpoint::bisimulation(system)
+    }
 }
