@@ -66,7 +66,9 @@ impl<T> RcList<T> {
     pub fn append(&mut self, e: Rc<RefCell<T>>) {
         let prev_tail = self.tail.take();
         self.tail = Some(e.clone());
-        if prev_tail.is_none() {
+        if let Some(prev_tail) = prev_tail.clone() {
+            self.set_next(prev_tail, Some(e.clone()))
+        } else {
             self.head = Some(e.clone());
         }
         self.set_next(e.clone(), None);
@@ -81,6 +83,7 @@ impl<T> RcList<T> {
     pub fn remove(&mut self, e: Rc<RefCell<T>>) -> Rc<RefCell<T>> {
         let next_opt = self.take_next(e.clone());
         let prev_opt = self.take_prev(e.clone());
+        assert!(next_opt.is_some() || prev_opt.is_some() || self.len() == 1);
 
         match next_opt {
             Some(next) => match prev_opt {
@@ -111,7 +114,7 @@ impl<T> RcList<T> {
 
     pub fn get(&mut self, i: usize) -> Option<Rc<RefCell<T>>> {
         let mut elem = self.head.clone();
-        for _ in 0..i {
+        for j in 0..i {
             elem = elem.map(|e| self.get_next(e)).flatten();
         }
         elem

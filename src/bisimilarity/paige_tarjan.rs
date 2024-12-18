@@ -46,10 +46,10 @@ pub struct State {
     is_deadlock: bool,
 
     /// Mark used to avoid duplicates in the third step
-    mark3: bool,
+    mark3: RefCell<bool>,
 
     /// Mark used to avoid duplicates in the fifth step
-    mark5: bool,
+    mark5: RefCell<bool>,
 
     /// count(s, B)
     count: Rc<RefCell<usize>>,
@@ -127,6 +127,7 @@ pub struct Block {
     child_ref: ListRef<Block>,
 }
 
+
 impl PaigeTarjan {
     fn new(lts: Lts) -> Self {
         let mut states: HashMap<_, _> = lts.states(false)
@@ -149,10 +150,7 @@ impl PaigeTarjan {
         }
 
         let mut c_blocks = RcList::new(Block::c_list_ref, Block::c_list_ref_mut);
-        let mut q = Block::new();
-        for state in all_states.iter() {
-            q.elements.append(state)
-        }
+        let q = Block::new();
         c_blocks.append_new(q);
 
         let q = c_blocks.get(0).unwrap();
@@ -173,6 +171,8 @@ impl PaigeTarjan {
         let mut p_blocks = RcList::new(Block::p_list_ref, Block::p_list_ref_mut);
         p_blocks.append(alive_block.clone());
         p_blocks.append(dead_block.clone());
+        alive_block.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&q));
+        dead_block.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&q));
         q.deref().borrow_mut().children.append(alive_block);
         q.deref().borrow_mut().children.append(dead_block);
 
@@ -210,18 +210,22 @@ impl PaigeTarjan {
             b_prime.elements.append(s);
         }
         let mut pred_b = RcList::new(State::pred_list_ref, State::pred_list_ref_mut);
+        let mut preds = Vec::new();
         for s_small_prime in (*b).borrow().elements.iter() {
             for trans in s_small_prime.deref().borrow().in_transitions.iter() {
                 let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
-                let mut lhs = lhs_rc.deref().borrow_mut();
-                if lhs.mark3 {
+                let lhs = lhs_rc.deref().borrow();
+                if *lhs.mark3.borrow() {
                     continue;
                 }
-                lhs.mark3 = true;
+                *lhs.mark3.borrow_mut() = true;
                 *lhs.count.deref().borrow_mut() += 1;
                 drop(lhs);
-                pred_b.append(lhs_rc);
+                preds.push(lhs_rc);
             }
+        }
+        for pred in preds {
+            pred_b.append(pred);
         }
 
         // 4. Calculate P' = split(B, P)
@@ -232,12 +236,12 @@ impl PaigeTarjan {
         for s_small_prime in b_prime.elements.iter() {
             for trans in s_small_prime.deref().borrow().in_transitions.iter() {
                 let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
-                let mut lhs = lhs_rc.deref().borrow_mut();
+                let lhs = lhs_rc.deref().borrow();
                 let trans_count = *trans.deref().borrow().count.deref().borrow();
                 let lhs_count = *lhs.count.deref().borrow();
 
-                if lhs_count == trans_count && !lhs.mark5 {
-                    lhs.mark5 = true;
+                if lhs_count == trans_count && !*lhs.mark5.borrow() {
+                    *lhs.mark5.borrow_mut() = true;
                     drop(lhs);
                     limited_pred_b.append(lhs_rc)
                 }
@@ -259,8 +263,8 @@ impl PaigeTarjan {
         }
         for state in self.states.iter() {
             let mut state = state.deref().borrow_mut();
-            state.mark3 = false;
-            state.mark5 = false;
+            state.mark3 = RefCell::new(false);
+            state.mark5 = RefCell::new(false);
         }
     }
 
@@ -276,12 +280,15 @@ impl PaigeTarjan {
                 d.deref().borrow_mut().attached = Some(d_prime.clone());
 
                 // only append d and d' once
+                d_prime.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&divider));
+                self.p_blocks.append(d_prime.clone());
                 divider.deref().borrow_mut().children.append(d_prime);
                 splitblocks.append(d.clone());
             }
 
             let d_prime = d.deref().borrow().attached.clone().unwrap();
             let s_small = d.deref().borrow_mut().elements.remove(s_small);
+            s_small.deref().borrow_mut().block_in_p = Rc::downgrade(&d_prime);
             d_prime.deref().borrow_mut().elements.append(s_small);
         }
         for d in splitblocks.iter() {
@@ -328,6 +335,21 @@ impl Block {
             }
         }
         rel
+    }
+
+    fn elements(&self) -> Vec<Rc<RefCell<State>>> {
+        if self.elements.empty() {
+            assert!(!self.children.empty());
+            let mut v = Vec::new();
+            for sub in self.children.iter() {
+                for e in sub.deref().borrow().elements.iter() {
+                    v.push(e);
+                }
+            }
+            v
+        } else {
+            self.elements.iter().collect()
+        }
     }
 
     /// Create new [`Block`], which is set up to serve as a copy
@@ -403,8 +425,8 @@ impl State {
             process,
             in_transitions: RcList::new(Transition::in_list_ref, Transition::in_list_ref_mut),
             is_deadlock: true,
-            mark3: false,
-            mark5: false,
+            mark3: RefCell::new(false),
+            mark5: RefCell::new(false),
             count: Rc::new(RefCell::new(0)),
             block_in_p: Weak::new(),
             pred_ref: ListRef::new(),
@@ -484,7 +506,6 @@ impl Transition {
     }
 }
 
-
 pub fn bisimulation(system: &CCSSystem) -> Relation {
     let lts = Lts::new(system);
     let mut pt = PaigeTarjan::new(lts);
@@ -500,3 +521,4 @@ pub fn bisimulation(system: &CCSSystem) -> Relation {
 
     rel
 }
+
