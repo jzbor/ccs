@@ -42,7 +42,6 @@ pub struct State {
     /// Block in P that this state is a part of
     block_in_p: Weak<RefCell<Block>>,
 
-
     /// Links for list of predecessors
     pred_ref: ListRef<Self>,
 
@@ -112,7 +111,7 @@ impl PaigeTarjan {
         let child1 = divider.deref().borrow_mut().children.get(0).unwrap();
         let child2 = divider.deref().borrow_mut().children.get(1).unwrap();
         let size1 = child1.deref().borrow().elements.len();
-        let size2 = child1.deref().borrow().elements.len();
+        let size2 = child2.deref().borrow().elements.len();
         let smaller = if size1 < size2 { child1 } else { child2 };
 
         // 2. Update R
@@ -191,15 +190,16 @@ impl PaigeTarjan {
 
             if d.deref().borrow().attached.is_none() {
                 let d_prime = Rc::new(RefCell::new(Block::new()));
-                d.deref().borrow_mut().attached = Some(d_prime);
+                d.deref().borrow_mut().attached = Some(d_prime.clone());
+
+                // only append d and d' once
+                divider.deref().borrow_mut().children.append(d_prime);
+                splitblocks.append(d.clone());
             }
 
             let d_prime = d.deref().borrow().attached.clone().unwrap();
             let s_small = d.deref().borrow_mut().elements.remove(s_small);
             d_prime.deref().borrow_mut().elements.append(s_small);
-
-            divider.deref().borrow_mut().children.append(d_prime);
-            splitblocks.append(d);
         }
         for d in splitblocks.iter() {
             d.deref().borrow_mut().attached = None;
