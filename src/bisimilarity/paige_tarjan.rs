@@ -183,6 +183,7 @@ impl PaigeTarjan {
 
     /// Split blocks by `divider`.
     fn split(&mut self, divider: Rc<RefCell<Block>>, pred_b: RcList<State>, s_prime: Rc<RefCell<Block>>) {
+        // TODO update block_in_p?
         let mut splitblocks = RcList::new(Block::split_list_ref, Block::split_list_ref_mut);
         for s_small in pred_b.iter() {
             let d = s_small.deref().borrow().block_in_p
