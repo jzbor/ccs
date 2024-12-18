@@ -96,6 +96,14 @@ enum Subcommand {
         /// Use faster Paige-Tarjan algorithm
         #[clap(short, long)]
         paige_tarjan: bool,
+
+        /// Bench mark algorithm
+        #[clap(short, long)]
+        bench: bool,
+
+        /// Don't print relation
+        #[clap(short, long)]
+        quiet: bool,
     },
 
     /// Generate a random LTS and represent it as a parsable CCS spec
@@ -227,7 +235,7 @@ fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()>
     Ok(())
 }
 
-fn bisimilarity(file: String, paige_tarjan: bool) -> CCSResult<()> {
+fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool) -> CCSResult<()> {
     let contents = error::resolve(
         fs::read_to_string(&file)
             .map_err(CCSError::file_error)
@@ -237,7 +245,7 @@ fn bisimilarity(file: String, paige_tarjan: bool) -> CCSResult<()> {
         Err(e) => {eprintln!("{}", e); process::exit(1) },
     };
 
-    let bisimulation = bisimilarity::bisimulation(&system, paige_tarjan);
+    let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
 
     if bisimulation.is_empty() {
         println!("No bisimulation found");
@@ -245,11 +253,17 @@ fn bisimilarity(file: String, paige_tarjan: bool) -> CCSResult<()> {
         println!("The bisimulation \"=BS=\":");
     }
 
-    for (s, t) in &bisimulation {
-        println!("  {} \t=BS= \t{}", s, t);
+    if !quiet {
+        for (s, t) in &bisimulation {
+            println!("  {} \t=BS= \t{}", s, t);
+        }
+
+        println!();
     }
 
-    println!();
+    if bench {
+        println!("took {:?}", duration);
+    }
     Ok(())
 }
 
@@ -264,7 +278,7 @@ fn main() {
         SyntaxTree { file, .. } => syntax_tree(file),
         Trace { file, allow_duplicates, .. } => trace(file, allow_duplicates),
         RandomLts { states, actions, transitions } => random(states, actions, transitions),
-        Bisimilarity { file, paige_tarjan, .. } => bisimilarity(file, paige_tarjan),
+        Bisimilarity { file, paige_tarjan, bench, quiet, .. } => bisimilarity(file, paige_tarjan, bench, quiet),
     };
 
     error::resolve(result);

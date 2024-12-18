@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use crate::ccs::*;
 
@@ -8,7 +8,7 @@ mod list;
 
 pub type Relation = HashSet<(Process, Process)>;
 
-pub fn bisimulation(system: &CCSSystem, paige_tarjan: bool) -> Relation {
+pub fn bisimulation(system: &CCSSystem, paige_tarjan: bool) -> (Relation, Duration) {
     if paige_tarjan {
         paige_tarjan::bisimulation(system)
     } else {

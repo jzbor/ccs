@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
+use std::time::{Duration, Instant};
 
 use crate::lts::{self, Lts};
 
@@ -506,9 +507,11 @@ impl Transition {
     }
 }
 
-pub fn bisimulation(system: &CCSSystem) -> Relation {
+pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
     let lts = Lts::new(system);
     let mut pt = PaigeTarjan::new(lts);
+
+    let starting = Instant::now();
 
     while !pt.finished() {
         pt.refine();
@@ -519,6 +522,8 @@ pub fn bisimulation(system: &CCSSystem) -> Relation {
         rel.extend(block.deref().borrow().cross())
     }
 
-    rel
+    let ending = Instant::now();
+
+    (rel, ending - starting)
 }
 

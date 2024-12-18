@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::time::Duration;
+use std::time::Instant;
 
 use crate::bisimilarity::Relation;
 use crate::ccs::*;
@@ -163,9 +165,11 @@ impl Transition {
     }
 }
 
-pub fn bisimulation(system: &CCSSystem) -> Relation {
+pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
     let lts = Lts::new(system);
     let mut fix = Fixpoint::new(lts);
+
+    let starting = Instant::now();
 
     let mut last_size = fix.relation.len() + 1;
     while fix.relation.len() < last_size {
@@ -173,5 +177,7 @@ pub fn bisimulation(system: &CCSSystem) -> Relation {
         fix.refine();
     }
 
-    fix.relation
+    let ending = Instant::now();
+
+    (fix.relation, ending - starting)
 }
