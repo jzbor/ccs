@@ -4,7 +4,7 @@
 
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
@@ -29,9 +29,6 @@ pub struct PaigeTarjan {
 
     /// List of all states
     states: RcList<State>,
-
-    /// List of all transitions
-    transitions: RcList<Transition>,
 }
 
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
@@ -77,6 +74,7 @@ pub struct State {
 /// A transition in the underlying LTS
 pub struct Transition {
     /// Description of the corresponding CCS transition
+    #[allow(dead_code)]
     desc: lts::Transition,
 
     /// Link to the [`State`] where the transition originates from.
@@ -182,7 +180,6 @@ impl PaigeTarjan {
             r_blocks,
             p_blocks,
             states: all_states,
-            transitions: all_transitions,
         }
     }
 
@@ -336,21 +333,6 @@ impl Block {
             }
         }
         rel
-    }
-
-    fn elements(&self) -> Vec<Rc<RefCell<State>>> {
-        if self.elements.empty() {
-            assert!(!self.children.empty());
-            let mut v = Vec::new();
-            for sub in self.children.iter() {
-                for e in sub.deref().borrow().elements.iter() {
-                    v.push(e);
-                }
-            }
-            v
-        } else {
-            self.elements.iter().collect()
-        }
     }
 
     /// Create new [`Block`], which is set up to serve as a copy

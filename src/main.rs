@@ -2,8 +2,6 @@ use std::fs;
 use std::io;
 use std::process;
 
-use ccs::CCSSystem;
-use ccs::Process;
 use clap::Parser;
 use error::CCSError;
 use error::CCSResult;

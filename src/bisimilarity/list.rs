@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 #[derive(Clone)]
 pub struct ListRef<T> {
@@ -57,6 +57,7 @@ impl<T> RcList<T> {
         e_ref.next.clone()
     }
 
+    #[allow(dead_code)]
     fn get_prev(&self, e: Rc<RefCell<T>>) -> Option<Rc<RefCell<T>>> {
         let borrow_e = e.deref().borrow();
         let e_ref = (self.get_ref)(&borrow_e);
@@ -114,15 +115,15 @@ impl<T> RcList<T> {
 
     pub fn get(&mut self, i: usize) -> Option<Rc<RefCell<T>>> {
         let mut elem = self.head.clone();
-        for j in 0..i {
-            elem = elem.map(|e| self.get_next(e)).flatten();
+        for _ in 0..i {
+            elem = elem.and_then(|e| self.get_next(e));
         }
         elem
     }
 
     pub fn pop_front(&mut self) -> Option<Rc<RefCell<T>>> {
         let front = self.peek_front();
-        front.map(|f| { self.remove(f.clone()); f })
+        front.inspect(|f| { self.remove(f.clone()); })
     }
 
     pub fn peek_front(&mut self) -> Option<Rc<RefCell<T>>> {

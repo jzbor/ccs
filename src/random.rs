@@ -46,7 +46,7 @@ impl Display for RandomLts {
                 continue;
             }
 
-            for (i, (label, dest)) in transitions.into_iter().enumerate() {
+            for (i, (label, dest)) in transitions.iter().enumerate() {
                 if i == 0 {
                     write!(f, "{}.{}", label, dest)?;
                 } else {

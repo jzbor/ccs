@@ -1,7 +1,5 @@
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::time::Duration;
@@ -16,7 +14,6 @@ use super::list::ListRef;
 use super::list::RcList;
 
 struct Fixpoint {
-    states: RcList<State>,
     state_map: HashMap<Process, Rc<RefCell<State>>>,
     relation: Relation,
 
@@ -55,7 +52,6 @@ impl Fixpoint {
         let relation = Self::init_relation(&all_states);
 
         Fixpoint {
-            states: all_states,
             state_map: states,
             relation,
         }
@@ -116,18 +112,6 @@ impl Fixpoint {
         rel
     }
 
-}
-
-fn cross_states(system1: &CCSSystem, system2: &CCSSystem) -> Relation {
-    let mut set = HashSet::new();
-
-    for x in Lts::new(system1).states(false) {
-        for y in Lts::new(system2).states(false) {
-            set.insert((x.clone(), y.clone()));
-        }
-    }
-
-    set
 }
 
 impl State {
