@@ -2,8 +2,6 @@ use std::fs;
 use std::io;
 use std::process;
 
-use ccs::CCSSystem;
-use ccs::Process;
 use clap::Parser;
 use error::CCSError;
 use error::CCSResult;
@@ -12,6 +10,7 @@ use lts::Lts;
 mod bisimilarity;
 mod ccs;
 mod parser;
+mod random;
 mod lts;
 mod error;
 #[cfg(test)]
@@ -28,14 +27,16 @@ struct Args {
 enum Subcommand {
     /// Parse and echo the CCS specification
     Parse {
-        #[command(flatten)]
-        common: CommonArgs,
+        /// File with CCS specification
+        #[clap()]
+        file: String,
     },
 
     /// Print out all traces of the LTS for the given CCS
     Trace {
-        #[command(flatten)]
-        common: CommonArgs,
+        /// File with CCS specification
+        #[clap()]
+        file: String,
 
         /// Allow duplicates (saves memory)
         #[clap(short, long)]
@@ -44,8 +45,9 @@ enum Subcommand {
 
     /// Print out all states of the LTS for the given CCS
     States {
-        #[command(flatten)]
-        common: CommonArgs,
+        /// File with CCS specification
+        #[clap()]
+        file: String,
 
         /// Allow duplicates (saves memory)
         #[clap(short, long)]
@@ -54,8 +56,9 @@ enum Subcommand {
 
     /// Print or visualize the Labeled Transition System for the given CCS
     Lts {
-        #[command(flatten)]
-        common: CommonArgs,
+        /// File with CCS specification
+        #[clap()]
+        file: String,
 
         /// Print in dot format for graph visualization
         #[clap(short, long)]
@@ -77,51 +80,62 @@ enum Subcommand {
     /// Display the syntax tree derived by the parser
     #[clap(hide(true))]
     SyntaxTree {
-        #[command(flatten)]
-        common: CommonArgs,
+        /// File with CCS specification
+        #[clap()]
+        file: String,
     },
 
     /// Calculate bisimulations and decide bisimilarity
     Bisimilarity {
-        #[command(flatten)]
-        common: CommonArgs,
-
-        /// File with second CCS specification
+        /// File with CCS specification
         #[clap()]
-        file2: String,
+        file: String,
+
+        /// Use faster Paige-Tarjan algorithm
+        #[clap(short, long)]
+        paige_tarjan: bool,
+
+        /// Bench mark algorithm
+        #[clap(short, long)]
+        bench: bool,
+
+        /// Don't print relation
+        #[clap(short, long)]
+        quiet: bool,
+
+        /// Compare algorithms
+        #[clap(short, long)]
+        algorithms: bool,
     },
-}
 
-#[derive(clap::Args, Debug, PartialEq, Clone)]
-struct CommonArgs {
-    /// File with CCS specification
-    // #[clap(global=true, default_value_t = String::from("default.ccs"))]
-    #[clap()]
-    file: String,
-}
+    /// Generate a random LTS and represent it as a parsable CCS spec
+    RandomLts {
+        /// Number of states in the generated system
+        #[clap(short, long)]
+        states: usize,
 
+        /// Number of different action labels in the generated system
+        #[clap(short, long)]
+        actions: usize,
 
-impl Subcommand {
-    fn common(&self) -> &CommonArgs {
-        use Subcommand::*;
-        match self {
-            Parse { common } => common,
-            Trace { common, .. } => common,
-            States { common, .. } => common,
-            Lts { common, .. } => common,
-            Bisimilarity { common, .. } => common,
-            SyntaxTree { common } => common,
-        }
+        /// Number of transitions
+        #[clap(short, long)]
+        transitions: usize,
     }
 }
 
-
-fn parse(system: CCSSystem) -> CCSResult<()> {
+fn parse(file: String) -> CCSResult<()> {
+    let contents = fs::read_to_string(&file)
+            .map_err(CCSError::file_error)?;
+    let system = parser::parse(file, &contents)?;
     println!("{}", system);
     Ok(())
 }
 
-fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool, allow_duplicates: bool) -> CCSResult<()> {
+fn lts(file: String, compare: Option<String>, graph: bool, x11: bool, allow_duplicates: bool) -> CCSResult<()> {
+    let contents = fs::read_to_string(&file)
+            .map_err(CCSError::file_error)?;
+    let system = parser::parse(file, &contents)?;
     let lts = Lts::new(&system);
 
     let compare_lts_opt = match compare {
@@ -183,7 +197,10 @@ fn lts(system: CCSSystem, compare: Option<String>, graph: bool, x11: bool, allow
     Ok(())
 }
 
-fn trace(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
+fn trace(file: String, allow_duplicates: bool) -> CCSResult<()> {
+    let contents = fs::read_to_string(&file)
+            .map_err(CCSError::file_error)?;
+    let system = parser::parse(file, &contents)?;
     let lts = Lts::new(&system);
 
     for trace in lts.traces(allow_duplicates) {
@@ -194,7 +211,10 @@ fn trace(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
     Ok(())
 }
 
-fn states(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
+fn states(file: String, allow_duplicates: bool) -> CCSResult<()> {
+    let contents = fs::read_to_string(&file)
+            .map_err(CCSError::file_error)?;
+    let system = parser::parse(file, &contents)?;
     let lts = Lts::new(&system);
 
     for state in lts.states(allow_duplicates) {
@@ -204,74 +224,82 @@ fn states(system: CCSSystem, allow_duplicates: bool) -> CCSResult<()> {
     Ok(())
 }
 
-fn bisimilarity(system1: CCSSystem, system2: CCSSystem) -> CCSResult<()> {
-    let bisimulation = bisimilarity::bisimulation(&system1, &system2);
-
-    if bisimulation.is_empty() {
-        println!("No bisimulation found");
-    } else {
-        println!("The bisimulation \"=BS=\":");
-    }
-
-    for (s, t) in &bisimulation {
-        println!("  {} \t=BS= \t{}", s, t);
-    }
-
-    println!();
-
-    let dp1 = system1.processes().get(system1.destinct_process()).unwrap();
-    let dp2 = system2.processes().get(system2.destinct_process()).unwrap();
-    let dpn1 = Process::ProcessName(system1.destinct_process().to_owned());
-    let dpn2 = Process::ProcessName(system2.destinct_process().to_owned());
-    if bisimulation.contains(&(dpn1, dpn2)) || bisimulation.contains(&(dp1.clone(), dp2.clone())) {
-        println!("Systems are bisimilar");
-    } else {
-        println!("Systems are NOT bisimilar");
-    }
+fn syntax_tree(file: String) -> CCSResult<()> {
+    let contents = fs::read_to_string(&file)
+            .map_err(CCSError::file_error)?;
+    println!("{:#?}", parser::first_pass(&contents));
     Ok(())
 }
 
-fn syntax_tree(contents: &str) -> CCSResult<()> {
-    println!("{:#?}", parser::first_pass(contents));
+fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()> {
+    let lts = random::RandomLts::generate(nstates, nactions, ntransitions);
+    println!("{}", lts);
+    Ok(())
+}
+
+fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, compare_algos: bool) -> CCSResult<()> {
+    let contents = error::resolve(
+        fs::read_to_string(&file)
+            .map_err(CCSError::file_error)
+    );
+    let system = match parser::parse(file, &contents) {
+        Ok(system) => system,
+        Err(e) => {eprintln!("{}", e); process::exit(1) },
+    };
+
+    if compare_algos {
+        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true);
+        println!("=== PAIGE-TARJAN ===");
+        println!("took: {:?}\t", duration_pt);
+        println!("size of bisimulation: {:?}\n", bisimulation_pt.len());
+
+        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false);
+        println!("=== NAIVE FIXPOINT ===");
+        println!("took: {:?}\t", duration_nf);
+        println!("size of bisimulation: {:?}\n", bisimulation_nf.len());
+
+        let bisims_equal = bisimulation_pt.is_subset(&bisimulation_nf) && bisimulation_nf.is_subset(&bisimulation_pt);
+        if bisims_equal {
+            println!("bisimulations are equal");
+        } else {
+            println!("bisimulations differ.")
+        }
+    } else {
+        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
+
+        if bisimulation.is_empty() {
+            println!("No bisimulation found");
+        } else {
+            println!("The bisimulation \"=BS=\":");
+        }
+
+        if !quiet {
+            for (s, t) in &bisimulation {
+                println!("  {} \t=BS= \t{}", s, t);
+            }
+
+            println!();
+        }
+
+        if bench {
+            println!("took {:?}", duration);
+        }
+    }
     Ok(())
 }
 
 fn main() {
     let args = Args::parse();
-    let path = args.subcommand.common().file.clone();
 
-    let contents = error::resolve(
-        fs::read_to_string(&path)
-            .map_err(CCSError::file_error)
-    );
-
-    if let Subcommand::SyntaxTree {..} = args.subcommand {
-        error::resolve(syntax_tree(&contents));
-    }
-
-    let system = match parser::parse(path, &contents) {
-        Ok(system) => system,
-        Err(e) => {eprintln!("{}", e); process::exit(1) },
-    };
-
+    use Subcommand::*;
     let result = match args.subcommand {
-        Subcommand::Lts { graph, x11, compare, allow_duplicates, .. } => lts(system, compare, graph, x11, allow_duplicates),
-        Subcommand::Parse {..} => parse(system),
-        Subcommand::States { allow_duplicates, .. } => states(system, allow_duplicates),
-        Subcommand::SyntaxTree {..} => Ok(()),
-        Subcommand::Trace { allow_duplicates, .. } => trace(system, allow_duplicates),
-        Subcommand::Bisimilarity { file2, .. } => {
-            let contents = error::resolve(
-                fs::read_to_string(&file2)
-                    .map_err(CCSError::file_error)
-            );
-            let system2 = match parser::parse(file2, &contents) {
-                Ok(system) => system,
-                Err(e) => {eprintln!("{}", e); process::exit(1) },
-            };
-
-            bisimilarity(system, system2)
-        },
+        Lts { file, graph, x11, compare, allow_duplicates } => lts(file, compare, graph, x11, allow_duplicates),
+        Parse { file } => parse(file),
+        States { file, allow_duplicates } => states(file, allow_duplicates),
+        SyntaxTree { file } => syntax_tree(file),
+        Trace { file, allow_duplicates } => trace(file, allow_duplicates),
+        RandomLts { states, actions, transitions } => random(states, actions, transitions),
+        Bisimilarity { file, paige_tarjan, bench, quiet, algorithms } => bisimilarity(file, paige_tarjan, bench, quiet, algorithms),
     };
 
     error::resolve(result);
