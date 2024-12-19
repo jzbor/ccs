@@ -130,10 +130,10 @@ pub struct Block {
 
 impl PaigeTarjan {
     fn new(lts: Lts) -> Self {
-        let mut states: HashMap<_, _> = lts.states(false)
+        let mut states: HashMap<_, _> = lts.states(false, true)
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
             .collect();
-        let lts_transitions = lts.transitions(false);
+        let lts_transitions = lts.transitions(false, true);
         let mut all_transitions = RcList::new(Transition::all_list_ref, Transition::all_list_ref_mut);
 
         for (from, label, to) in lts_transitions {

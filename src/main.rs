@@ -182,13 +182,13 @@ fn lts(file: String, compare: Option<String>, graph: bool, x11: bool, allow_dupl
     }
 
     if !x11 && !graph {
-        for (p, a, q) in lts.transitions(allow_duplicates) {
+        for (p, a, q) in lts.transitions(allow_duplicates, false) {
             println!("{} --{}--> {}", p, a, q);
         }
 
         if let Some(compare_lts) = compare_lts_opt {
             println!();
-            for (p, a, q) in compare_lts.transitions(allow_duplicates) {
+            for (p, a, q) in compare_lts.transitions(allow_duplicates, false) {
                 println!("{} --{}--> {}", p, a, q);
             }
         }
@@ -217,7 +217,7 @@ fn states(file: String, allow_duplicates: bool) -> CCSResult<()> {
     let system = parser::parse(file, &contents)?;
     let lts = Lts::new(&system);
 
-    for state in lts.states(allow_duplicates) {
+    for state in lts.states(allow_duplicates, false) {
         println!("{}", state);
     }
 

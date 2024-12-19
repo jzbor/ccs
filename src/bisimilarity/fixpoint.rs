@@ -34,10 +34,10 @@ struct Transition {
 
 impl Fixpoint {
     fn new(lts: Lts) -> Self {
-        let mut states: HashMap<_, _> = lts.states(false)
+        let mut states: HashMap<_, _> = lts.states(false, false)
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
             .collect();
-        let lts_transitions = lts.transitions(false);
+        let lts_transitions = lts.transitions(false, false);
 
         for (from, label, to) in lts_transitions {
             let trans = Rc::new(RefCell::new(Transition::new((from.clone(), label, to.clone()))));

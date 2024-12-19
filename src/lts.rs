@@ -40,24 +40,44 @@ impl Lts {
         Lts { system: system.clone() }
     }
 
-    pub fn transitions(&self, allow_duplicates: bool) -> LtsTransitionIterator {
+    pub fn transitions(&self, allow_duplicates: bool, include_disconnected: bool) -> LtsTransitionIterator {
         let destinct_process = self.system.destinct_process().clone();
+
+        let undiscovered_states = if include_disconnected {
+            self.system.processes()
+                .keys()
+                .map(|p| Process::ProcessName(p.clone()))
+                .collect()
+        }  else {
+            VecDeque::from([ Process::ProcessName(destinct_process) ])
+        };
+
         LtsTransitionIterator {
             lts: self,
             allow_duplicates,
             discovered_states: HashSet::new(),
             cached_transitions: VecDeque::new(),
-            undiscovered_states: VecDeque::from([ Process::ProcessName(destinct_process) ]),
+            undiscovered_states,
         }
     }
 
-    pub fn states(&self, allow_duplicates: bool) -> LtsStateIterator {
+    pub fn states(&self, allow_duplicates: bool, include_disconnected: bool) -> LtsStateIterator {
         let destinct_process = self.system.destinct_process().clone();
+
+        let undiscovered_states = if include_disconnected {
+            self.system.processes()
+                .keys()
+                .map(|p| Process::ProcessName(p.clone()))
+                .collect()
+        }  else {
+            VecDeque::from([ Process::ProcessName(destinct_process) ])
+        };
+
         LtsStateIterator {
             lts: self,
             allow_duplicates,
             discovered_states: HashSet::new(),
-            undiscovered_states: VecDeque::from([ Process::ProcessName(destinct_process) ]),
+            undiscovered_states,
         }
     }
 
@@ -107,7 +127,7 @@ impl Lts {
                 writeln!(f, "    label=\"{}\"", lts.system.name())?;
             }
 
-            for (p, a, q) in lts.transitions(false) {
+            for (p, a, q) in lts.transitions(false, true) {
                 let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
                 let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
 
