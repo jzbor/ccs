@@ -276,9 +276,6 @@ impl PaigeTarjan {
             state.mark5 = RefCell::new(false);
             state.count = Rc::new(RefCell::new(0));
         }
-
-        //delete B'
-        //drop(b_prime);
     }
 
     /// Split blocks by `divider`.
@@ -310,10 +307,8 @@ impl PaigeTarjan {
             if d.deref().borrow().elements.empty() {
                 self.p_blocks.remove(d.clone());
 
-                //todo: brauchts das?
                 let u = d.deref().borrow_mut().upper_in_r.clone().unwrap().upgrade().unwrap();
                 u.deref().borrow_mut().children.remove(d.clone());
-                // //assert!(!u.deref().borrow().children.empty());
             } else {
                 let s_prime = d.deref().borrow().upper_in_r.as_ref()
                     .unwrap().upgrade().unwrap();
@@ -323,7 +318,7 @@ impl PaigeTarjan {
             }
         }
 
-        //clean up split list refs
+        // clean up split list refs
         while splitblocks.pop_front().is_some() {};
     }
 
@@ -378,11 +373,6 @@ impl Block {
     fn new_containing(block: Rc<RefCell<Block>>) -> Self {
         let mut new = Self::new();
         new.children.append(block.clone());
-
-        //todo nur P-Blocke haben doch Zustaende?
-        // for state in block.deref().borrow().elements.iter() {
-        //     new.elements.append(state);
-        // }
         new
     }
 

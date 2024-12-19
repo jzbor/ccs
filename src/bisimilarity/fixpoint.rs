@@ -97,7 +97,7 @@ impl Fixpoint {
 
     fn apply_f(&mut self) {
         self.relation = self.relation.iter()
-            .map(|(s, t)| (self.state_map.get(&s).unwrap().clone(), self.state_map.get(&t).unwrap().clone()))
+            .map(|(s, t)| (self.state_map.get(s).unwrap().clone(), self.state_map.get(t).unwrap().clone()))
             .filter(|(s, t)| self.is_in_f(s.clone(), t.clone()))
             .map(|(s, t)| (s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()))
             .collect()
