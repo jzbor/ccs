@@ -140,13 +140,16 @@ impl PaigeTarjan {
             let lhs = states.get(&from).unwrap();
             lhs.deref().borrow_mut().is_deadlock = false;
             let trans = Rc::new(RefCell::new(Transition::new((from, label, to.clone()), Rc::downgrade(lhs))));
+            trans.deref().borrow_mut().count = lhs.deref().borrow().count.clone();
+            *lhs.deref().borrow_mut().count.deref().borrow_mut() += 1;
             states.get_mut(&to).unwrap().deref().deref().borrow_mut().in_transitions.append(trans.clone());
             all_transitions.append(trans);
         }
 
         let mut all_states = RcList::new(State::all_list_ref, State::all_list_ref_mut);
         for state in states.into_values() {
-            all_states.append(state)
+            state.deref().borrow_mut().count = Rc::new(RefCell::new(0));
+            all_states.append(state);
         }
 
         let mut c_blocks = RcList::new(Block::c_list_ref, Block::c_list_ref_mut);
@@ -194,7 +197,6 @@ impl PaigeTarjan {
         let size2 = child2.deref().borrow().elements.len();
         let smaller = if size1 < size2 { child1 } else { child2 };
 
-        println!("Smaller block from divider: {:?}",smaller.deref().borrow());
 
         // 2. Update R
         let b = divider.deref().borrow_mut().children.remove(smaller);
@@ -246,7 +248,7 @@ impl PaigeTarjan {
                 if lhs_count == trans_count && !*lhs.mark5.borrow() {
                     *lhs.mark5.borrow_mut() = true;
                     drop(lhs);
-                    limited_pred_b.append(lhs_rc)
+                    limited_pred_b.append(lhs_rc);
                 }
             }
         }
@@ -258,9 +260,9 @@ impl PaigeTarjan {
         for s_small_prime in b_prime.elements.iter() {
             for trans_rc in s_small_prime.deref().borrow().in_transitions.iter() {
                 let mut trans = trans_rc.deref().borrow_mut();
-                if *trans.count.deref().borrow() > 0 {
-                    *trans.count.deref().borrow_mut() -= 1;
-                }
+
+                assert!(*trans.count.deref().borrow() > 0);
+                *trans.count.deref().borrow_mut() -= 1;
                 trans.count = trans.lhs.upgrade().unwrap().deref().borrow().count.clone();
             }
         }
@@ -268,6 +270,7 @@ impl PaigeTarjan {
             let mut state = state.deref().borrow_mut();
             state.mark3 = RefCell::new(false);
             state.mark5 = RefCell::new(false);
+            state.count = Rc::new(RefCell::new(0));
         }
 
         //delete B'
@@ -286,9 +289,10 @@ impl PaigeTarjan {
                 d.deref().borrow_mut().attached = Some(d_prime.clone());
 
                 // only append d and d' once
-                d_prime.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&divider));
+                let upper = d.deref().borrow().upper_in_r.clone().unwrap();
+                d_prime.deref().borrow_mut().upper_in_r = Some(upper.clone());
                 self.p_blocks.append(d_prime.clone());
-                divider.deref().borrow_mut().children.append(d_prime);
+                upper.clone().upgrade().unwrap().deref().borrow_mut().children.append(d_prime);
                 splitblocks.append(d.clone());
             }
 
@@ -301,6 +305,11 @@ impl PaigeTarjan {
             d.deref().borrow_mut().attached = None;
             if d.deref().borrow().elements.empty() {
                 self.p_blocks.remove(d.clone());
+
+                //todo: brauchts das?
+                let u = d.deref().borrow_mut().upper_in_r.clone().unwrap().upgrade().unwrap();
+                u.deref().borrow_mut().children.remove(d.clone());
+                // //assert!(!u.deref().borrow().children.empty());
             } else {
                 let s_prime = d.deref().borrow().upper_in_r.as_ref()
                     .unwrap().upgrade().unwrap();
@@ -309,6 +318,9 @@ impl PaigeTarjan {
                 }
             }
         }
+
+        //clean up split list refs
+        while splitblocks.pop_front().is_some() {};
     }
 
     fn finished(&self) -> bool {
@@ -501,7 +513,7 @@ impl Transition {
         Transition {
             desc,
             lhs,
-            count: Rc::new(RefCell::new(1)),
+            count: Rc::new(RefCell::new(0)),
             in_ref: ListRef::new(),
             all_ref: ListRef::new(),
         }
@@ -531,15 +543,8 @@ pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
     let starting = Instant::now();
 
     while !pt.finished() {
-        println!("R={:?}", pt.r_blocks);
-        println!("P={:?}", pt.p_blocks);
-        println!("C={:?}\n", pt.c_blocks);
         pt.refine();
     }
-
-    println!("R={:?}", pt.r_blocks);
-    println!("P={:?}", pt.p_blocks);
-
 
     let mut rel = Relation::new();
     for block in pt.p_blocks.iter() {
