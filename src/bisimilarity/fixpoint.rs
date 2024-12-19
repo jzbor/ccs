@@ -20,7 +20,7 @@ struct Fixpoint {
 }
 
 struct State {
-    desc: Process,
+    desc: Rc<Process>,
     transitions: RcList<Transition>,
 
     all_ref: ListRef<Self>,
@@ -67,7 +67,8 @@ impl Fixpoint {
             let mut t_next = false;
             for ttrans in t.deref().borrow().transitions.iter() {
                 if ttrans.deref().borrow().desc.1 == strans.deref().borrow().desc.1
-                        && self.relation.contains(&(strans.deref().borrow().desc.2.clone(), ttrans.deref().borrow().desc.2.clone())){
+                        && self.relation.contains(&(strans.deref().borrow().desc.2.clone().into(),
+                                                    ttrans.deref().borrow().desc.2.clone().into())) {
                     t_next = true
                 }
             }
@@ -81,7 +82,8 @@ impl Fixpoint {
             let mut s_next = false;
             for strans in s.deref().borrow().transitions.iter() {
                 if ttrans.deref().borrow().desc.1 == strans.deref().borrow().desc.1
-                        && self.relation.contains(&(ttrans.deref().borrow().desc.2.clone(), strans.deref().borrow().desc.2.clone())){
+                        && self.relation.contains(&(ttrans.deref().borrow().desc.2.clone().into(),
+                                                    strans.deref().borrow().desc.2.clone().into())){
                     s_next = true
                 }
             }
@@ -94,7 +96,7 @@ impl Fixpoint {
     }
 
     fn apply_f(&mut self) {
-        self.relation = self.relation.clone().into_iter()
+        self.relation = self.relation.iter()
             .map(|(s, t)| (self.state_map.get(&s).unwrap().clone(), self.state_map.get(&t).unwrap().clone()))
             .filter(|(s, t)| self.is_in_f(s.clone(), t.clone()))
             .map(|(s, t)| (s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()))
@@ -117,7 +119,7 @@ impl Fixpoint {
 impl State {
     fn new(desc: Process) -> Self {
         State {
-            desc,
+            desc: Rc::new(desc),
             transitions: RcList::new(Transition::trans_list_ref, Transition::trans_list_ref_mut),
             all_ref: ListRef::new(),
         }

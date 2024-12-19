@@ -35,7 +35,7 @@ pub struct PaigeTarjan {
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
 pub struct State {
     /// Process that is represented by this state
-    process: Process,
+    process: Rc<Process>,
 
     /// List of all transitions _into_ this state.
     /// Linked by [`Transition::list_ref`].
@@ -234,7 +234,7 @@ impl PaigeTarjan {
         }
 
         // 4. Calculate P' = split(B, P)
-        self.split(divider.clone(), pred_b);
+        self.split(pred_b);
 
         // 5. Calculate <-[B]\<-[S\B]
         let mut limited_pred_b = RcList::new(State::limpred_list_ref, State::limpred_list_ref_mut);
@@ -258,7 +258,7 @@ impl PaigeTarjan {
         }
 
         // 6. Calculate split(S\B, P')
-        self.split(divider, limited_pred_b);
+        self.split(limited_pred_b);
 
         // 7. Update counter and cleanup markers
         for s_small_prime in b_prime.elements.iter() {
@@ -282,7 +282,7 @@ impl PaigeTarjan {
     }
 
     /// Split blocks by `divider`.
-    fn split(&mut self, divider: Rc<RefCell<Block>>, pred_b: RcList<State>) {
+    fn split(&mut self, pred_b: RcList<State>) {
         let mut splitblocks = RcList::new(Block::split_list_ref, Block::split_list_ref_mut);
         for s_small in pred_b.iter() {
             let d = s_small.deref().borrow().block_in_p
@@ -450,7 +450,7 @@ impl Debug for Block {
 impl State {
     fn new(process: Process) -> Self {
         State {
-            process,
+            process: Rc::new(process),
             in_transitions: RcList::new(Transition::in_list_ref, Transition::in_list_ref_mut),
             is_deadlock: true,
             mark3: RefCell::new(false),
