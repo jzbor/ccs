@@ -43,19 +43,26 @@ impl CCSSystem {
 }
 
 impl Process {
+
     pub fn direct_successors(&self, system: &CCSSystem) -> HashSet<(ActionLabel, Process)> {
+        let mut set = HashSet::new();
+        self.direct_successors_helper(system, &mut set);
+        set
+    }
+
+    fn direct_successors_helper(&self, system: &CCSSystem, set: &mut HashSet<(ActionLabel, Process)>) {
         use Process::*;
         match self {
-            Deadlock() => HashSet::new(),
+            Deadlock() => (),
             ProcessName(name) => match system.processes().get(name) {
-                Some(p) => p.direct_successors(system),
-                None => HashSet::new(),
+                Some(p) => p.direct_successors_helper(system, set),
+                None => (),
             },
-            Action(label, process) => HashSet::from([ (label.clone(), *process.clone()) ]),
-            NonDetChoice(left, right) => left.direct_successors(system)
-                    .union(&right.direct_successors(system))
-                    .cloned()
-                    .collect(),
+            Action(label, process) => { set.insert((label.clone(), *process.clone())); },
+            NonDetChoice(left, right) => {
+                left.direct_successors_helper(system, set);
+                right.direct_successors_helper(system, set);
+            },
             Parallel(left, right) => {
                 let with_left_succ: HashSet<_> = left.direct_successors(system)
                     .into_iter()
@@ -76,24 +83,26 @@ impl Process {
                     }
                 }
 
-                with_left_succ.union(&with_right_succ)
-                    .cloned().collect::<HashSet<_>>()
-                    .union(&com3_succ)
-                    .cloned().collect()
+                set.extend(with_left_succ);
+                set.extend(with_right_succ);
+                set.extend(com3_succ);
             },
-            Rename(process, b, a) => process.direct_successors(system)
-                .into_iter()
-                .map(|(label, succ_proc)| if label == *a {
-                    (b.to_owned(), Rename(succ_proc.into(), b.clone(), a.clone()))
-                } else {
-                        (label.to_owned(), Rename(succ_proc.into(), b.clone(), a.clone()))
-                    })
-                .collect(),
-            Restriction(process, label) => process.direct_successors(system)
-                .into_iter()
-                .filter(|(l, _)| l != label && !Self::actions_complementary(l, label))
-                .map(|(l, p)| (l, Restriction(p.into(), label.clone())))
-                .collect(),
+            Rename(process, b, a) => set.extend(
+                process.direct_successors(system)
+                    .into_iter()
+                    .map(|(label, succ_proc)| if label == *a {
+                            (b.to_owned(), Rename(succ_proc.into(), b.clone(), a.clone()))
+                        } else {
+                                (label.to_owned(), Rename(succ_proc.into(), b.clone(), a.clone()))
+                        }
+                    )
+            ),
+            Restriction(process, label) => set.extend(
+                process.direct_successors(system)
+                    .into_iter()
+                    .filter(|(l, _)| l != label && !Self::actions_complementary(l, label))
+                    .map(|(l, p)| (l, Restriction(p.into(), label.clone())))
+            ),
         }
     }
 
