@@ -238,6 +238,7 @@ impl PaigeTarjan {
 
         // 5. Calculate <-[B]\<-[S\B]
         let mut limited_pred_b = RcList::new(State::limpred_list_ref, State::limpred_list_ref_mut);
+        let mut limited_preds = Vec::new();
         for s_small_prime in b_prime.elements.iter() {
             for trans in s_small_prime.deref().borrow().in_transitions.iter() {
                 let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
@@ -248,9 +249,12 @@ impl PaigeTarjan {
                 if lhs_count == trans_count && !*lhs.mark5.borrow() {
                     *lhs.mark5.borrow_mut() = true;
                     drop(lhs);
-                    limited_pred_b.append(lhs_rc);
+                    limited_preds.push(lhs_rc);
                 }
             }
+        }
+        for pred in limited_preds {
+            limited_pred_b.append(pred);
         }
 
         // 6. Calculate split(S\B, P')
