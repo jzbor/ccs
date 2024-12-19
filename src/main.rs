@@ -267,13 +267,13 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, comp
     } else {
         let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
 
-        if bisimulation.is_empty() {
-            println!("No bisimulation found");
-        } else {
-            println!("The bisimulation \"=BS=\":");
-        }
-
         if !quiet {
+            if bisimulation.is_empty() {
+                println!("No bisimulation found");
+            } else {
+                println!("The bisimulation \"=BS=\":");
+            }
+
             for (s, t) in &bisimulation {
                 println!("  {} \t=BS= \t{}", s, t);
             }
