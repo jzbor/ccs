@@ -18,9 +18,10 @@ pub struct RcList<T> {
     size: usize,
 }
 
-pub struct RcListIterator<T> {
-    current: Option<Rc<RefCell<T>>>,
+pub struct RcListIterator<'a, T> {
+    current: Option<*const Rc<RefCell<T>>>,
     get_ref: GetRef<T>,
+    list: &'a RcList<T>,
 }
 
 impl<T> RcList<T> {
@@ -132,7 +133,11 @@ impl<T> RcList<T> {
     }
 
     pub fn iter(&self) -> RcListIterator<T> {
-        RcListIterator { current: self.head.clone(), get_ref: self.get_ref }
+        RcListIterator {
+            current: self.head.as_ref().map(|h| h as *const Rc<RefCell<T>>),
+            get_ref: self.get_ref,
+            list: self
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -165,17 +170,20 @@ impl<T> ListRef<T> {
     }
 }
 
-impl<T> Iterator for RcListIterator<T> {
-    type Item = Rc<RefCell<T>>;
+impl<'a, T> Iterator for RcListIterator<'a, T> {
+    type Item = &'a Rc<RefCell<T>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.current.take() {
             Some(current) => {
-                let mut cur_borrow = current.deref().borrow_mut();
-                let cur_ref = (self.get_ref)(&mut cur_borrow);
-                self.current = cur_ref.next.clone();
-                drop(cur_borrow);
-                Some(current)
+                // let cur_ptr = current.as_ptr() as *mut RefCell<T>;
+                // let cur_borrow = unsafe { (*cur_ptr).borrow() };
+                unsafe {
+                    let cur_ptr = (*current).as_ptr();
+                    let cur_ref = (self.get_ref)(&*cur_ptr);
+                    self.current = cur_ref.next.as_ref().map(|n| n as *const Rc<RefCell<T>>);
+                    Some(&*current)
+                }
             },
             None => None,
         }

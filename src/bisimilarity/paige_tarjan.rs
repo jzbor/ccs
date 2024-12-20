@@ -131,9 +131,10 @@ pub struct Block {
 impl PaigeTarjan {
     fn new(lts: Lts) -> Self {
         let mut states: HashMap<_, _> = lts.states(false, true)
+            .collect::<Vec<_>>().into_iter()
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
             .collect();
-        let lts_transitions = lts.transitions(false, true);
+        let lts_transitions: Vec<_> = lts.transitions(false, true).collect();
         let mut all_transitions = RcList::new(Transition::all_list_ref, Transition::all_list_ref_mut);
 
         for (from, label, to) in lts_transitions {
@@ -165,10 +166,10 @@ impl PaigeTarjan {
         for state in all_states.iter() {
             if state.deref().borrow().is_deadlock {
                 state.deref().borrow_mut().block_in_p = Rc::downgrade(&dead_block);
-                dead_block.deref().borrow_mut().elements.append(state)
+                dead_block.deref().borrow_mut().elements.append(state.clone())
             } else {
                 state.deref().borrow_mut().block_in_p = Rc::downgrade(&alive_block);
-                alive_block.deref().borrow_mut().elements.append(state)
+                alive_block.deref().borrow_mut().elements.append(state.clone())
             }
         }
         let mut p_blocks = RcList::new(Block::p_list_ref, Block::p_list_ref_mut);
@@ -210,7 +211,7 @@ impl PaigeTarjan {
         // 3. Calculate Predecessors of B
         let mut b_prime = Block::new_as_copy();
         for s in b.deref().borrow().elements.iter() {
-            b_prime.elements.append(s);
+            b_prime.elements.append(s.clone());
         }
         let mut pred_b = RcList::new(State::pred_list_ref, State::pred_list_ref_mut);
         let mut preds = Vec::new();
@@ -290,15 +291,15 @@ impl PaigeTarjan {
                 d.deref().borrow_mut().attached = Some(d_prime.clone());
 
                 // only append d and d' once
-                let upper = d.deref().borrow().upper_in_r.clone().unwrap();
+                let upper = d.deref().borrow().upper_in_r.as_ref().unwrap().clone();
                 d_prime.deref().borrow_mut().upper_in_r = Some(upper.clone());
                 self.p_blocks.append(d_prime.clone());
                 upper.clone().upgrade().unwrap().deref().borrow_mut().children.append(d_prime);
                 splitblocks.append(d.clone());
             }
 
-            let d_prime = d.deref().borrow().attached.clone().unwrap();
-            let s_small = d.deref().borrow_mut().elements.remove(s_small);
+            let d_prime = d.deref().borrow().attached.as_ref().unwrap().clone();
+            let s_small = d.deref().borrow_mut().elements.remove(s_small.clone());
             s_small.deref().borrow_mut().block_in_p = Rc::downgrade(&d_prime);
             d_prime.deref().borrow_mut().elements.append(s_small);
         }
@@ -307,7 +308,7 @@ impl PaigeTarjan {
             if d.deref().borrow().elements.empty() {
                 self.p_blocks.remove(d.clone());
 
-                let u = d.deref().borrow_mut().upper_in_r.clone().unwrap().upgrade().unwrap();
+                let u = d.deref().borrow_mut().upper_in_r.as_ref().unwrap().upgrade().unwrap();
                 u.deref().borrow_mut().children.remove(d.clone());
             } else {
                 let s_prime = d.deref().borrow().upper_in_r.as_ref()
@@ -344,14 +345,12 @@ impl Block {
         }
     }
 
-    fn cross(&self) -> Relation {
-        let mut rel = Relation::new();
+    fn register_into_relation(&self, rel: &mut Vec<(Rc<Process>, Rc<Process>)>) {
         for a in self.elements.iter() {
             for b in self.elements.iter() {
-                rel.insert((a.deref().borrow().process.clone(), b.deref().borrow().process.clone()));
+                rel.push((a.deref().borrow().process.clone(), b.deref().borrow().process.clone()));
             }
         }
-        rel
     }
 
     /// Create new [`Block`], which is set up to serve as a copy
@@ -542,7 +541,7 @@ pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
 
     let mut rel = Relation::new();
     for block in pt.p_blocks.iter() {
-        rel.extend(block.deref().borrow().cross())
+        block.deref().borrow().register_into_relation(&mut rel);
     }
 
     let ending = Instant::now();

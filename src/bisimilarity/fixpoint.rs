@@ -103,11 +103,11 @@ impl Fixpoint {
             .collect()
     }
 
-    fn init_relation(states: &RcList<State>) -> Relation{
+    fn init_relation(states: &RcList<State>) -> Relation {
         let mut rel = Relation::new();
         for s in states.iter() {
             for t in states.iter() {
-                rel.insert((s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()));
+                rel.push((s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()));
             }
         }
 
