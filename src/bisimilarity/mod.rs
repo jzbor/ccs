@@ -9,10 +9,10 @@ mod list;
 
 pub type Relation = Vec<(Rc<Process>, Rc<Process>)>;
 
-pub fn bisimulation(system: &CCSSystem, paige_tarjan: bool) -> (Relation, Duration) {
+pub fn bisimulation(system: &CCSSystem, paige_tarjan: bool, collect: bool) -> (Option<Relation>, Duration) {
     if paige_tarjan {
-        paige_tarjan::bisimulation(system)
+        paige_tarjan::bisimulation(system, collect)
     } else {
-        fixpoint::bisimulation(system)
+        fixpoint::bisimulation(system, collect)
     }
 }

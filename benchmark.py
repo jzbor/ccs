@@ -7,11 +7,11 @@ LTS_FILE_NAME = "python_benchmarks_tmp"
 
 
 def plot ():
-    start_states = 1000
-    start_transitions = 1000
-    step = 500
-    end_states = 5000
-    end_transitions = 5000
+    start_states = 100000
+    start_transitions = 100000
+    step = 100000
+    end_states = 1000000
+    end_transitions = 1000000
 
     pt_times = []
     for s in range(start_states, end_states + 1, step):
@@ -44,9 +44,9 @@ def measure_time(states: int, transitions: int, pt: bool) -> float:
     subprocess.call(f"./target/release/ccs random-lts -s {states} -t {transitions} -a 1 >{LTS_FILE_NAME}", shell=True)
 
     if pt:
-        flags = "-bp"
+        flags = "-bpq"
     else:
-        flags = "-b"
+        flags = "-bq"
     args = ["./target/release/ccs", "bisimilarity", flags, f"{LTS_FILE_NAME}"]
     result = subprocess.run(args, stdout=subprocess.PIPE)
     result = result.stdout.decode("utf-8")

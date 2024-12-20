@@ -27,9 +27,6 @@ pub struct PaigeTarjan {
     /// Fine partition P
     /// Linked by [`Block::p_ref`]
     p_blocks: RcList<Block>,
-
-    /// List of all states
-    states: RcList<State>,
 }
 
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
@@ -184,7 +181,6 @@ impl PaigeTarjan {
             c_blocks,
             r_blocks,
             p_blocks,
-            states: all_states,
         }
     }
 
@@ -529,7 +525,7 @@ impl Transition {
     }
 }
 
-pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
+pub fn bisimulation(system: &CCSSystem, collect: bool) -> (Option<Relation>, Duration) {
     let lts = Lts::new(system);
     let mut pt = PaigeTarjan::new(lts);
 
@@ -539,13 +535,16 @@ pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
         pt.refine();
     }
 
-    let mut rel = Relation::new();
-    for block in pt.p_blocks.iter() {
-        block.deref().borrow().register_into_relation(&mut rel);
-    }
-
     let ending = Instant::now();
+    if collect {
+        let mut rel = Relation::new();
+        for block in pt.p_blocks.iter() {
+            block.deref().borrow().register_into_relation(&mut rel);
+        }
 
-    (rel, ending - starting)
+        (Some(rel), ending - starting)
+    } else {
+        (None, ending - starting)
+    }
 }
 

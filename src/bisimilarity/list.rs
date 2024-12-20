@@ -21,7 +21,7 @@ pub struct RcList<T> {
 pub struct RcListIterator<'a, T> {
     current: Option<*const Rc<RefCell<T>>>,
     get_ref: GetRef<T>,
-    list: &'a RcList<T>,
+    _list: &'a RcList<T>,
 }
 
 impl<T> RcList<T> {
@@ -136,7 +136,7 @@ impl<T> RcList<T> {
         RcListIterator {
             current: self.head.as_ref().map(|h| h as *const Rc<RefCell<T>>),
             get_ref: self.get_ref,
-            list: self
+            _list: self
         }
     }
 

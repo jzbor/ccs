@@ -1,6 +1,5 @@
 use std::io;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::rc::{Rc, Weak};
 
 use crate::ccs::{ActionLabel, CCSSystem, Process};
 use crate::error::CCSResult;

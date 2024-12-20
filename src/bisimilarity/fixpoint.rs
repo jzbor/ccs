@@ -151,7 +151,7 @@ impl Transition {
     }
 }
 
-pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
+pub fn bisimulation(system: &CCSSystem, collect: bool) -> (Option<Relation>, Duration) {
     let lts = Lts::new(system);
     let mut fix = Fixpoint::new(lts);
 
@@ -165,5 +165,9 @@ pub fn bisimulation(system: &CCSSystem) -> (Relation, Duration) {
 
     let ending = Instant::now();
 
-    (fix.relation, ending - starting)
+    if collect {
+        (Some(fix.relation), ending - starting)
+    } else {
+        (None, ending - starting)
+    }
 }

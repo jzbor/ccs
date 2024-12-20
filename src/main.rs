@@ -248,26 +248,23 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, comp
     };
 
     if compare_algos {
-        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true);
+        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true, !quiet);
         println!("=== PAIGE-TARJAN ===");
         println!("took: {:?}\t", duration_pt);
-        println!("size of bisimulation: {:?}\n", bisimulation_pt.len());
+        if let Some(bisim) = bisimulation_pt {
+            println!("size of bisimulation: {:?}\n", bisim.len());
+        }
 
-        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false);
+        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false, !quiet);
         println!("=== NAIVE FIXPOINT ===");
         println!("took: {:?}\t", duration_nf);
-        println!("size of bisimulation: {:?}\n", bisimulation_nf.len());
-
-        // let bisims_equal = bisimulation_pt.is_subset(&bisimulation_nf) && bisimulation_nf.is_subset(&bisimulation_pt);
-        // if bisims_equal {
-        //     println!("bisimulations are equal");
-        // } else {
-        //     println!("bisimulations differ.")
-        // }
+        if let Some(bisim) = bisimulation_nf {
+            println!("size of bisimulation: {:?}\n", bisim.len());
+        }
     } else {
-        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan);
+        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan, !quiet);
 
-        if !quiet {
+        if let Some(bisimulation) = bisimulation {
             if bisimulation.is_empty() {
                 println!("No bisimulation found");
             } else {
