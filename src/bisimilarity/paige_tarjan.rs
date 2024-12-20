@@ -271,8 +271,8 @@ impl PaigeTarjan {
                 trans.count = trans.lhs.upgrade().unwrap().deref().borrow().count.clone();
             }
         }
-        for state in self.states.iter() {
-            let mut state = state.deref().borrow_mut();
+        for s_small_prime in b_prime.elements.iter() {
+            let mut state = s_small_prime.deref().borrow_mut();
             state.mark3 = RefCell::new(false);
             state.mark5 = RefCell::new(false);
             state.count = Rc::new(RefCell::new(0));
