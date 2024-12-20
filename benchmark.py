@@ -10,8 +10,8 @@ def plot ():
     start_states = 1000
     start_transitions = 1000
     step = 500
-    end_states = 10000
-    end_transitions = 10000
+    end_states = 5000
+    end_transitions = 5000
 
     pt_times = []
     for s in range(start_states, end_states + 1, step):
