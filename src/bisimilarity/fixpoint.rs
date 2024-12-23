@@ -34,10 +34,10 @@ struct Transition {
 
 impl Fixpoint {
     fn new(lts: Lts) -> Self {
-        let mut states: HashMap<_, _> = lts.states(false, true)
+        let mut states: HashMap<_, _> = lts.states(false)
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
             .collect();
-        let lts_transitions = lts.transitions(false, true);
+        let lts_transitions = lts.transitions(false);
 
         for (from, label, to) in lts_transitions {
             let trans = Rc::new(RefCell::new(Transition::new((from.clone(), label, to.clone()))));
@@ -152,7 +152,7 @@ impl Transition {
 }
 
 pub fn bisimulation(system: &CCSSystem, collect: bool) -> (Option<Relation>, Duration) {
-    let lts = Lts::new(system);
+    let lts = Lts::new(system, true);
     let mut fix = Fixpoint::new(lts);
 
     let starting = Instant::now();

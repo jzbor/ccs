@@ -136,13 +136,13 @@ fn lts(file: String, compare: Option<String>, graph: bool, x11: bool, allow_dupl
     let contents = fs::read_to_string(&file)
             .map_err(CCSError::file_error)?;
     let system = parser::parse(file, &contents)?;
-    let lts = Lts::new(&system);
+    let lts = Lts::new(&system, false);
 
     let compare_lts_opt = match compare {
         Some(path) => {
             let contents = fs::read_to_string(&path)
                 .map_err(CCSError::file_error)?;
-            let compare_lts = Lts::new(&parser::parse(path, &contents)?);
+            let compare_lts = Lts::new(&parser::parse(path, &contents)?, false);
             Some(compare_lts)
         },
         None => None,
@@ -182,13 +182,13 @@ fn lts(file: String, compare: Option<String>, graph: bool, x11: bool, allow_dupl
     }
 
     if !x11 && !graph {
-        for (p, a, q) in lts.transitions(allow_duplicates, false) {
+        for (p, a, q) in lts.transitions(allow_duplicates) {
             println!("{} --{}--> {}", p, a, q);
         }
 
         if let Some(compare_lts) = compare_lts_opt {
             println!();
-            for (p, a, q) in compare_lts.transitions(allow_duplicates, false) {
+            for (p, a, q) in compare_lts.transitions(allow_duplicates) {
                 println!("{} --{}--> {}", p, a, q);
             }
         }
@@ -201,7 +201,7 @@ fn trace(file: String, allow_duplicates: bool) -> CCSResult<()> {
     let contents = fs::read_to_string(&file)
             .map_err(CCSError::file_error)?;
     let system = parser::parse(file, &contents)?;
-    let lts = Lts::new(&system);
+    let lts = Lts::new(&system, false);
 
     for trace in lts.traces(allow_duplicates) {
         let words: Vec<String> = trace.into_iter().map(|s| (*s).clone()).collect();
@@ -215,9 +215,9 @@ fn states(file: String, allow_duplicates: bool) -> CCSResult<()> {
     let contents = fs::read_to_string(&file)
             .map_err(CCSError::file_error)?;
     let system = parser::parse(file, &contents)?;
-    let lts = Lts::new(&system);
+    let lts = Lts::new(&system, false);
 
-    for state in lts.states(allow_duplicates, false) {
+    for state in lts.states(allow_duplicates) {
         println!("{}", state);
     }
 

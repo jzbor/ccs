@@ -9,6 +9,7 @@ pub type Trace = Vec<ActionLabel>;
 
 pub struct Lts {
     system: CCSSystem,
+    disconnected: bool,
 }
 
 pub struct LtsTransitionIterator<'a> {
@@ -36,14 +37,14 @@ pub struct LtsTraceIterator<'a> {
 
 
 impl Lts {
-    pub fn new(system: &CCSSystem) -> Self {
-        Lts { system: system.clone() }
+    pub fn new(system: &CCSSystem, disconnected: bool) -> Self {
+        Lts { system: system.clone(), disconnected }
     }
 
-    pub fn transitions(&self, allow_duplicates: bool, include_disconnected: bool) -> LtsTransitionIterator {
+    pub fn transitions(&self, allow_duplicates: bool) -> LtsTransitionIterator {
         let destinct_process = self.system.destinct_process().clone();
 
-        let undiscovered_states = if include_disconnected {
+        let undiscovered_states = if self.disconnected {
             self.system.processes()
                 .keys()
                 .map(|p| Process::ProcessName(p.clone()))
@@ -61,10 +62,10 @@ impl Lts {
         }
     }
 
-    pub fn states(&self, allow_duplicates: bool, include_disconnected: bool) -> LtsStateIterator {
+    pub fn states(&self, allow_duplicates: bool) -> LtsStateIterator {
         let destinct_process = self.system.destinct_process().clone();
 
-        let undiscovered_states = if include_disconnected {
+        let undiscovered_states = if self.disconnected {
             self.system.processes()
                 .keys()
                 .map(|p| Process::ProcessName(p.clone()))
@@ -127,7 +128,7 @@ impl Lts {
                 writeln!(f, "    label=\"{}\"", lts.system.name())?;
             }
 
-            for (p, a, q) in lts.transitions(false, true) {
+            for (p, a, q) in lts.transitions(false) {
                 let p_id = name_alloc(&p, &mut id_counter, &mut node_ids);
                 let q_id = name_alloc(&q, &mut id_counter, &mut node_ids);
 
