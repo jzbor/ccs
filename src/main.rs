@@ -99,9 +99,9 @@ enum Subcommand {
         #[clap(short, long)]
         bench: bool,
 
-        /// Don't print relation
+        /// Calculate and print the corresponding relation
         #[clap(short, long)]
-        quiet: bool,
+        relation: bool,
 
         /// Compare algorithms
         #[clap(short, long)]
@@ -237,7 +237,7 @@ fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()>
     Ok(())
 }
 
-fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, compare_algos: bool) -> CCSResult<()> {
+fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, relation: bool, compare_algos: bool) -> CCSResult<()> {
     let contents = error::resolve(
         fs::read_to_string(&file)
             .map_err(CCSError::file_error)
@@ -248,21 +248,23 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, quiet: bool, comp
     };
 
     if compare_algos {
-        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true, !quiet);
+        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true, relation);
         println!("=== PAIGE-TARJAN ===");
         println!("took: {:?}\t", duration_pt);
         if let Some(bisim) = bisimulation_pt {
-            println!("size of bisimulation: {:?}\n", bisim.len());
+            println!("size of bisimulation: {:?}", bisim.len());
         }
+        println!();
 
-        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false, !quiet);
+        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false, relation);
         println!("=== NAIVE FIXPOINT ===");
         println!("took: {:?}\t", duration_nf);
         if let Some(bisim) = bisimulation_nf {
-            println!("size of bisimulation: {:?}\n", bisim.len());
+            println!("size of bisimulation: {:?}", bisim.len());
         }
+        println!();
     } else {
-        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan, !quiet);
+        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan, relation);
 
         if let Some(bisimulation) = bisimulation {
             if bisimulation.is_empty() {
@@ -296,7 +298,7 @@ fn main() {
         SyntaxTree { file } => syntax_tree(file),
         Trace { file, allow_duplicates } => trace(file, allow_duplicates),
         RandomLts { states, actions, transitions } => random(states, actions, transitions),
-        Bisimilarity { file, paige_tarjan, bench, quiet, algorithms } => bisimilarity(file, paige_tarjan, bench, quiet, algorithms),
+        Bisimilarity { file, paige_tarjan, bench, relation, algorithms } => bisimilarity(file, paige_tarjan, bench, relation, algorithms),
     };
 
     error::resolve(result);
