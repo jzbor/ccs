@@ -62,6 +62,15 @@ impl Lts {
         }
     }
 
+    pub fn labels(&self) -> Vec<ActionLabel> {
+        let mut labels: Vec<_> = self.transitions(true)
+            .map(|(_, a, _)| a)
+            .collect();
+        labels.sort();
+        labels.dedup();
+        labels
+    }
+
     pub fn states(&self, allow_duplicates: bool) -> LtsStateIterator {
         let destinct_process = self.system.destinct_process().clone();
 

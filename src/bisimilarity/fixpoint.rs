@@ -107,8 +107,11 @@ impl Fixpoint {
         let mut rel = Relation::new();
         for s in states.iter() {
             for t in states.iter() {
-                rel.push((s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()));
+                if s.deref().borrow().desc != t.deref().borrow().desc {
+                    rel.push((s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()));
+                }
             }
+            rel.push((s.deref().borrow().desc.clone(), s.deref().borrow().desc.clone()));
         }
 
         rel

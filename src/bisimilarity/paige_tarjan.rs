@@ -4,7 +4,7 @@
 
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::lts::{self, Lts};
 
-use super::{list::*, CCSSystem, Process, Relation};
+use super::{list::*, ActionLabel, CCSSystem, Process, Relation};
 
 /// State of the algorithm
 pub struct PaigeTarjan {
@@ -27,6 +27,8 @@ pub struct PaigeTarjan {
     /// Fine partition P
     /// Linked by [`Block::p_ref`]
     p_blocks: RcList<Block>,
+
+    labels: Vec<ActionLabel>,
 }
 
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
@@ -35,8 +37,13 @@ pub struct State {
     process: Rc<Process>,
 
     /// List of all transitions _into_ this state.
-    /// Linked by [`Transition::list_ref`].
+    /// Linked by [`Transition::in_ref`].
     in_transitions: RcList<Transition>,
+
+    /// List of all transitions _out of_ this state.
+    /// Linked by [`Transition::out_ref`].
+    out_transitions: RcList<Transition>,
+
 
     /// true if this state has no outgoing transitions
     is_deadlock: bool,
@@ -84,6 +91,9 @@ pub struct Transition {
     /// Links for [`State::in_transitions`].
     in_ref: ListRef<Self>,
 
+    /// Links for [`State::out_transitions`].
+    out_ref: ListRef<Self>,
+
     /// Links for [`PaigeTarjan::transitions`]
     all_ref: ListRef<Self>,
 }
@@ -126,16 +136,89 @@ pub struct Block {
 
 
 impl PaigeTarjan {
+    fn new_with_labels(lts: Lts) -> Self {
+        let mut block_map: BTreeMap<Vec<ActionLabel>, Vec<Rc<RefCell<State>>>> = BTreeMap::new();
+        let mut labels = HashSet::new();
+        let states: HashMap<_, _> = lts.states(false)
+            .collect::<Vec<_>>().into_iter()
+            .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
+            .collect();
+
+        // create state and transition objects
+        for (from, label, to) in lts.transitions(false) {
+            let lhs = states.get(&from).unwrap();
+            let rhs = states.get(&to).unwrap();
+            labels.insert(label.clone());
+            let trans = Rc::new(RefCell::new(Transition::new((from, label, to), Rc::downgrade(lhs))));
+            lhs.deref().borrow_mut().out_transitions.append(trans.clone());
+            rhs.deref().borrow_mut().in_transitions.append(trans);
+        }
+
+        // create partitions
+        for state in states.into_values() {
+            let mut labels = Vec::new();
+            for trans in state.deref().borrow().out_transitions.iter() {
+                labels.push(trans.deref().borrow().desc.1.clone());
+            }
+            labels.sort();
+            labels.dedup();
+            if let Some(list) = block_map.get_mut(&labels) {
+                list.push(state);
+            } else {
+                block_map.insert(labels, vec!(state));
+            }
+        }
+
+        // create C, R, P and Q
+        let mut c_blocks = RcList::new(Block::c_list_ref, Block::c_list_ref_mut);
+        let mut r_blocks = RcList::new(Block::r_list_ref, Block::r_list_ref_mut);
+        let mut p_blocks = RcList::new(Block::p_list_ref, Block::p_list_ref_mut);
+        let q = Rc::new(RefCell::new(Block::new()));
+        c_blocks.append(q.clone());
+        r_blocks.append(q.clone());
+
+        // create initial blocks in P
+        for states in block_map.into_values() {
+            let block = Rc::new(RefCell::new(Block::new()));
+
+            for state in states {
+                let count = Rc::new(RefCell::new(0));
+                for trans in state.deref().borrow().out_transitions.iter() {
+                    *count.deref().borrow_mut() += 1;
+                    trans.deref().borrow_mut().count = count.clone()
+                }
+
+                state.deref().borrow_mut().block_in_p = Rc::downgrade(&block);
+                block.deref().borrow_mut().elements.append(state);
+            }
+
+            block.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&q));
+            q.deref().borrow_mut().children.append(block.clone());
+            p_blocks.append(block);
+        }
+
+        let labels = labels.into_iter().collect();
+
+        PaigeTarjan {
+            c_blocks,
+            r_blocks,
+            p_blocks,
+            labels
+        }
+    }
+
     fn new(lts: Lts) -> Self {
         let mut states: HashMap<_, _> = lts.states(false)
             .collect::<Vec<_>>().into_iter()
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
             .collect();
+        let mut labels = HashSet::new();
         let lts_transitions: Vec<_> = lts.transitions(false).collect();
         let mut all_transitions = RcList::new(Transition::all_list_ref, Transition::all_list_ref_mut);
 
         for (from, label, to) in lts_transitions {
             let lhs = states.get(&from).unwrap();
+            labels.insert(label.clone());
             lhs.deref().borrow_mut().is_deadlock = false;
             let trans = Rc::new(RefCell::new(Transition::new((from, label, to.clone()), Rc::downgrade(lhs))));
             trans.deref().borrow_mut().count = lhs.deref().borrow().count.clone();
@@ -177,10 +260,13 @@ impl PaigeTarjan {
         q.deref().borrow_mut().children.append(alive_block);
         q.deref().borrow_mut().children.append(dead_block);
 
+        let labels = labels.into_iter().collect();
+
         PaigeTarjan {
             c_blocks,
             r_blocks,
             p_blocks,
+            labels
         }
     }
 
@@ -204,74 +290,88 @@ impl PaigeTarjan {
             self.c_blocks.append(divider.clone());
         }
 
-        // 3. Calculate Predecessors of B
-        let mut b_prime = Block::new_as_copy();
-        for s in b.deref().borrow().elements.iter() {
-            b_prime.elements.append(s.clone());
-        }
-        let mut pred_b = RcList::new(State::pred_list_ref, State::pred_list_ref_mut);
-        let mut preds = Vec::new();
-        for s_small_prime in (*b).borrow().elements.iter() {
-            for trans in s_small_prime.deref().borrow().in_transitions.iter() {
-                let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
-                let lhs = lhs_rc.deref().borrow();
-
-                *lhs.count.deref().borrow_mut() += 1;
-
-                if *lhs.mark3.borrow() {
-                    continue;
-                }
-                *lhs.mark3.borrow_mut() = true;
-                drop(lhs);
-                preds.push(lhs_rc);
+        for label in self.labels.clone() {
+            // 3. Calculate Predecessors of B
+            let mut b_prime = Block::new_as_copy();
+            for s in b.deref().borrow().elements.iter() {
+                b_prime.elements.append(s.clone());
             }
-        }
-        for pred in preds {
-            pred_b.append(pred);
-        }
+            let mut pred_b = RcList::new(State::pred_list_ref, State::pred_list_ref_mut);
+            let mut preds = Vec::new();
+            for s_small_prime in (*b).borrow().elements.iter() {
+                for trans in s_small_prime.deref().borrow().in_transitions.iter() {
+                    if trans.deref().borrow().desc.1 != label {
+                        continue;
+                    }
 
-        // 4. Calculate P' = split(B, P)
-        self.split(pred_b);
+                    let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
+                    let lhs = lhs_rc.deref().borrow();
 
-        // 5. Calculate <-[B]\<-[S\B]
-        let mut limited_pred_b = RcList::new(State::limpred_list_ref, State::limpred_list_ref_mut);
-        let mut limited_preds = Vec::new();
-        for s_small_prime in b_prime.elements.iter() {
-            for trans in s_small_prime.deref().borrow().in_transitions.iter() {
-                let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
-                let lhs = lhs_rc.deref().borrow();
-                let trans_count = *trans.deref().borrow().count.deref().borrow();
-                let lhs_count = *lhs.count.deref().borrow();
+                    *lhs.count.deref().borrow_mut() += 1;
 
-                if lhs_count == trans_count && !*lhs.mark5.borrow() {
-                    *lhs.mark5.borrow_mut() = true;
+                    if *lhs.mark3.borrow() {
+                        continue;
+                    }
+                    *lhs.mark3.borrow_mut() = true;
                     drop(lhs);
-                    limited_preds.push(lhs_rc);
+                    preds.push(lhs_rc);
                 }
             }
-        }
-        for pred in limited_preds {
-            limited_pred_b.append(pred);
-        }
-
-        // 6. Calculate split(S\B, P')
-        self.split(limited_pred_b);
-
-        // 7. Update counter and cleanup markers
-        for s_small_prime in b_prime.elements.iter() {
-            for trans_rc in s_small_prime.deref().borrow().in_transitions.iter() {
-                let mut trans = trans_rc.deref().borrow_mut();
-
-                assert!(*trans.count.deref().borrow() > 0);
-                *trans.count.deref().borrow_mut() -= 1;
-                trans.count = trans.lhs.upgrade().unwrap().deref().borrow().count.clone();
+            for pred in preds {
+                pred_b.append(pred);
             }
-        }
-        for s_small_prime in b_prime.elements.iter() {
-            let mut state = s_small_prime.deref().borrow_mut();
-            state.mark3 = RefCell::new(false);
-            state.mark5 = RefCell::new(false);
-            state.count = Rc::new(RefCell::new(0));
+
+            // 4. Calculate P' = split(B, P)
+            self.split(pred_b);
+
+            // 5. Calculate <-[B]\<-[S\B]
+            let mut limited_pred_b = RcList::new(State::limpred_list_ref, State::limpred_list_ref_mut);
+            let mut limited_preds = Vec::new();
+            for s_small_prime in b_prime.elements.iter() {
+                for trans in s_small_prime.deref().borrow().in_transitions.iter() {
+                    if trans.deref().borrow().desc.1 != label {
+                        continue;
+                    }
+
+                    let lhs_rc = trans.deref().borrow().lhs.clone().upgrade().unwrap();
+                    let lhs = lhs_rc.deref().borrow();
+                    let trans_count = *trans.deref().borrow().count.deref().borrow();
+                    let lhs_count = *lhs.count.deref().borrow();
+
+                    if lhs_count == trans_count && !*lhs.mark5.borrow() {
+                        *lhs.mark5.borrow_mut() = true;
+                        drop(lhs);
+                        limited_preds.push(lhs_rc);
+                    }
+                }
+            }
+            for pred in limited_preds {
+                limited_pred_b.append(pred);
+            }
+
+            // 6. Calculate split(S\B, P')
+            self.split(limited_pred_b);
+
+            // 7. Update counter and cleanup markers
+            for s_small_prime in b_prime.elements.iter() {
+                for trans_rc in s_small_prime.deref().borrow().in_transitions.iter() {
+                    if trans_rc.deref().borrow().desc.1 != label {
+                        continue;
+                    }
+
+                    let mut trans = trans_rc.deref().borrow_mut();
+
+                    assert!(*trans.count.deref().borrow() > 0);
+                    *trans.count.deref().borrow_mut() -= 1;
+                    trans.count = trans.lhs.upgrade().unwrap().deref().borrow().count.clone();
+                }
+            }
+            for s_small_prime in b_prime.elements.iter() {
+                let mut state = s_small_prime.deref().borrow_mut();
+                state.mark3 = RefCell::new(false);
+                state.mark5 = RefCell::new(false);
+                state.count = Rc::new(RefCell::new(0));
+            }
         }
     }
 
@@ -437,6 +537,7 @@ impl State {
         State {
             process: Rc::new(process),
             in_transitions: RcList::new(Transition::in_list_ref, Transition::in_list_ref_mut),
+            out_transitions: RcList::new(Transition::out_list_ref, Transition::out_list_ref_mut),
             is_deadlock: true,
             mark3: RefCell::new(false),
             mark5: RefCell::new(false),
@@ -504,6 +605,7 @@ impl Transition {
             lhs,
             count: Rc::new(RefCell::new(0)),
             in_ref: ListRef::new(),
+            out_ref: ListRef::new(),
             all_ref: ListRef::new(),
         }
     }
@@ -523,11 +625,19 @@ impl Transition {
     fn in_list_ref_mut(&mut self) -> &mut ListRef<Transition> {
         &mut self.borrow_mut().in_ref
     }
+
+    fn out_list_ref(&self) -> &ListRef<Transition> {
+        &self.borrow().out_ref
+    }
+
+    fn out_list_ref_mut(&mut self) -> &mut ListRef<Transition> {
+        &mut self.borrow_mut().out_ref
+    }
 }
 
 pub fn bisimulation(system: &CCSSystem, collect: bool) -> (Option<Relation>, Duration) {
     let lts = Lts::new(system, true);
-    let mut pt = PaigeTarjan::new(lts);
+    let mut pt = PaigeTarjan::new_with_labels(lts);
 
     let starting = Instant::now();
 
