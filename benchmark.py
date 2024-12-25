@@ -44,9 +44,9 @@ def measure_time(states: int, transitions: int, pt: bool) -> float:
     subprocess.call(f"./target/release/ccs random-lts -s {states} -t {transitions} -a 1 >{LTS_FILE_NAME}", shell=True)
 
     if pt:
-        flags = "-bpq"
+        flags = "-bp"
     else:
-        flags = "-bq"
+        flags = "-b"
     args = ["./target/release/ccs", "bisimilarity", flags, f"{LTS_FILE_NAME}"]
     result = subprocess.run(args, stdout=subprocess.PIPE)
     result = result.stdout.decode("utf-8")
