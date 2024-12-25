@@ -10,6 +10,12 @@ pest_derive = "2.7.14"
 rand = "0.8.5"
 thiserror = "2.0.2"
 
+[dev-dependencies]
+ntest = "0.9.3"
+
+[features]
+very_big_test = []
+
 [profile.profiling]
 inherits = "release"
 debug = true

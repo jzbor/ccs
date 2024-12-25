@@ -177,6 +177,11 @@ impl PaigeTarjan {
         c_blocks.append(q.clone());
         r_blocks.append(q.clone());
 
+        // create empty block to ensure there are enough blocks in the beginning
+        let empty = Rc::new(RefCell::new(Block::new()));
+        empty.deref().borrow_mut().upper_in_r = Some(Rc::downgrade(&q));
+        q.deref().borrow_mut().children.append(empty);
+
         // create initial blocks in P
         for states in block_map.into_values() {
             let block = Rc::new(RefCell::new(Block::new()));
