@@ -12,6 +12,7 @@
     inherit (nixpkgs) lib;
     pkgs = nixpkgs.legacyPackages.${system};
     craneLib = crane.mkLib pkgs;
+    benchmarkPythonEnv = pkgs.python3.withPackages(ps: [ ps.matplotlib ]);
   in {
     packages = {
       default = craneLib.buildPackage {
@@ -22,12 +23,16 @@
         '';
       };
 
-      benchmark = let
-        pythonEnv = pkgs.python3.withPackages(ps: [ ps.matplotlib ]);
-      in pkgs.writeShellApplication {
+      benchmark = pkgs.writeShellApplication {
         name = "benchmark";
-        text = "${pythonEnv}/bin/python3 ${self}/benchmark.py \"$@\"";
+        text = "${benchmarkPythonEnv}/bin/python3 ${self}/benchmark.py \"$@\"";
       };
+
+      render-benchmark = pkgs.writeShellApplication {
+        name = "render-benchmark";
+        text = "${benchmarkPythonEnv}/bin/python3 ${self}/render_benchmark.py \"$@\"";
+      };
+
 
       profile = let
         ccs = craneLib.buildPackage {
@@ -52,7 +57,9 @@
       inherit (self.packages.${system}.default) name;
 
       # Additional tools
-      nativeBuildInputs = [];
+      nativeBuildInputs = [
+        benchmarkPythonEnv
+      ];
     };
   });
 }

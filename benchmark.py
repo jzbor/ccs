@@ -1,53 +1,30 @@
+import json
+import os
 import re
 import subprocess
+import sys
 
-import matplotlib.pyplot as plt
-
-LTS_FILE_NAME = "python_benchmarks_tmp"
+LTS_FILE_NAME = "/tmp/benchmark.ccs"
 
 
-def plot ():
-    start_states = 100000
-    start_transitions = 100000
-    step = 100000
-    end_states = 1000000
-    end_transitions = 1000000
-
+def bench(binary: str, step_width: int, nsteps: int):
     pt_times = []
-    for s in range(start_states, end_states + 1, step):
-        for t in range(start_transitions, end_transitions + 1, step):
-            pt = measure_time(s, t, True)
+    for s in range(step_width, step_width * nsteps + 1, step_width):
+        for t in range(step_width, step_width * nsteps + 1, step_width):
+            pt = measure_time(binary, s, t, True)
             pt_times.append((s, t, pt))
-            print(f"finished {s}x{t}")
+            print(f"finished {s}x{t}", file=sys.stderr)
 
-    print("(states, transitions, time in seconds)")
-    print(f"pt: {pt_times}")
+    return pt_times
 
-    x_coordinates = [x for (x, _, _) in pt_times]
-    y_coordinates = [y for (_, y, _) in pt_times]
-    times = [t for (_, _, t) in pt_times]
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-
-    # Plot a basic wireframe.
-    ax.scatter(x_coordinates, y_coordinates, times, marker='o')
-
-    ax.set_xlabel("states")
-    ax.set_ylabel("transitions")
-    ax.set_zlabel("time [s]")
-
-    plt.savefig("python_benchmark.pdf")
-    plt.show()
-
-def measure_time(states: int, transitions: int, pt: bool) -> float:
-    subprocess.call(f"./target/release/ccs random-lts -s {states} -t {transitions} -a 1 >{LTS_FILE_NAME}", shell=True)
+def measure_time(binary: str, states: int, transitions: int, pt: bool) -> float:
+    subprocess.call(f"{binary} random-lts -s {states} -t {transitions} -a 1 >{LTS_FILE_NAME}", shell=True)
 
     if pt:
         flags = "-bp"
     else:
         flags = "-b"
-    args = ["./target/release/ccs", "bisimilarity", flags, f"{LTS_FILE_NAME}"]
+    args = ["./target/release/ccs", "bisimilarity", flags, LTS_FILE_NAME]
     result = subprocess.run(args, stdout=subprocess.PIPE)
     result = result.stdout.decode("utf-8")
     #todo maybe check if both bisimilarities are equal
@@ -59,9 +36,11 @@ def measure_time(states: int, transitions: int, pt: bool) -> float:
 
     pt_time = parse_time(match.group(1))
 
+    os.remove(LTS_FILE_NAME)
+
     return pt_time
 
-def parse_time (time:str) -> float:
+def parse_time(time:str) -> float:
     nano = re.match(r"(\d+\.?\d+)ns", time)
     if not nano is None:
         return float(nano.group(1)) * 1e-9
@@ -81,10 +60,34 @@ def parse_time (time:str) -> float:
     raise ValueError("unexpected time format " + time)
 
 
-def main():
-    subprocess.call(["cargo", "build", "--release"])
+def usage():
+    print("Usage:");
+    print(f"  {sys.argv[0]} [binary] [step_width] [nsteps]");
+    pass
 
-    plot()
+def main():
+    binary = "./target/release/ccs"
+    step_width = 100000
+    nsteps = 10
+    outfile = "benchmark.json"
+
+    if "-h" in sys.argv or "--help" in sys.argv or "help" in sys.argv:
+        usage()
+        return
+
+    if len(sys.argv) > 1:
+        binary = sys.argv[1]
+    if len(sys.argv) > 2:
+        step_width = int(sys.argv[2])
+    if len(sys.argv) > 3:
+        nsteps = int(sys.argv[3])
+
+
+    data = bench(binary, step_width, nsteps)
+
+    with open(outfile, "w") as write:
+        json.dump(data, write)
+        print(f"written data to {outfile}", file=sys.stderr)
 
 if __name__ == '__main__':
     main()
