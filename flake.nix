@@ -14,8 +14,10 @@
     craneLib = crane.mkLib pkgs;
     benchmarkPythonEnv = pkgs.python3.withPackages(ps: [ ps.matplotlib ]);
   in {
-    packages = {
-      default = craneLib.buildPackage {
+    packages = rec {
+      default = ccs;
+
+      ccs = craneLib.buildPackage {
         src = ./.;
         nativeBuildInputs = [ pkgs.makeWrapper ];
         postInstall = ''
@@ -25,7 +27,7 @@
 
       benchmark = pkgs.writeShellApplication {
         name = "benchmark";
-        text = "${benchmarkPythonEnv}/bin/python3 ${self}/benchmark.py \"$@\"";
+        text = "${benchmarkPythonEnv}/bin/python3 ${self}/benchmark.py ${ccs}/bin/ccs \"$@\"";
       };
 
       render-benchmark = pkgs.writeShellApplication {

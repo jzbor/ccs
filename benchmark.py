@@ -24,7 +24,7 @@ def measure_time(binary: str, states: int, transitions: int, pt: bool) -> float:
         flags = "-bp"
     else:
         flags = "-b"
-    args = ["./target/release/ccs", "bisimilarity", flags, LTS_FILE_NAME]
+    args = [binary, "bisimilarity", flags, LTS_FILE_NAME]
     result = subprocess.run(args, stdout=subprocess.PIPE)
     result = result.stdout.decode("utf-8")
     #todo maybe check if both bisimilarities are equal
@@ -82,6 +82,7 @@ def main():
     if len(sys.argv) > 3:
         nsteps = int(sys.argv[3])
 
+    print(f"Benchmarking {binary} with {nsteps} steps of width {step_width}")
 
     data = bench(binary, step_width, nsteps)
 

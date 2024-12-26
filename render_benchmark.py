@@ -23,6 +23,7 @@ def render_3d(data, show=False):
     ax.set_xlabel("number of states")
     ax.set_ylabel("number of transitions")
     ax.set_zlabel("time in seconds")
+    ax.set_zlim(bottom=0)
 
     plt.savefig(f"{OUTDIR}/bench3d.svg");
     plt.savefig(f"{OUTDIR}/bench3d.png");
@@ -41,6 +42,7 @@ def render_states(filename: str, transitions: int, data):
 
     ax.set_xlabel(f"number of states ({transitions} transitions)")
     ax.set_ylabel("time in seconds")
+    ax.set_ylim(bottom=0)
 
     plt.savefig(f"{OUTDIR}/{filename}.svg");
     plt.savefig(f"{OUTDIR}/{filename}.png");
@@ -56,6 +58,7 @@ def render_transitions(filename: str, states: int, data):
 
     ax.set_xlabel(f"number of transitions ({states} states)")
     ax.set_ylabel("time in seconds")
+    ax.set_ylim(bottom=0)
 
     plt.savefig(f"{OUTDIR}/{filename}.svg");
     plt.savefig(f"{OUTDIR}/{filename}.png");
