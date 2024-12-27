@@ -13,12 +13,23 @@
     pkgs = nixpkgs.legacyPackages.${system};
     craneLib = crane.mkLib pkgs;
     benchmarkPythonEnv = pkgs.python3.withPackages(ps: [ ps.matplotlib ]);
+    srcFilter = path: type: (builtins.match ".*pest$" path != null) || (builtins.match ".*ccs$" path != null) || (craneLib.filterCargoSources path type);
+    filteredSrc = lib.cleanSourceWith {
+      src = ./.;
+      filter = srcFilter;
+      name = "source";
+    };
+    benchSrc = lib.cleanSourceWith {
+      src = ./.;
+      filter = path: _: builtins.match ".*py$" path != null;
+      name = "source";
+    };
   in {
     packages = rec {
       default = ccs;
 
       ccs = craneLib.buildPackage {
-        src = ./.;
+        src = filteredSrc;
         nativeBuildInputs = [ pkgs.makeWrapper ];
         postInstall = ''
           wrapProgram $out/bin/ccs --prefix PATH : ${lib.makeBinPath [ pkgs.graphviz ]}
@@ -27,12 +38,12 @@
 
       benchmark = pkgs.writeShellApplication {
         name = "benchmark";
-        text = "${benchmarkPythonEnv}/bin/python3 ${self}/benchmark.py ${ccs}/bin/ccs \"$@\"";
+        text = "${benchmarkPythonEnv}/bin/python3 ${benchSrc}/benchmark.py ${ccs}/bin/ccs \"$@\"";
       };
 
       render-benchmark = pkgs.writeShellApplication {
         name = "render-benchmark";
-        text = "${benchmarkPythonEnv}/bin/python3 ${self}/render_benchmark.py \"$@\"";
+        text = "${benchmarkPythonEnv}/bin/python3 ${benchSrc}/render_benchmark.py \"$@\"";
       };
 
 
