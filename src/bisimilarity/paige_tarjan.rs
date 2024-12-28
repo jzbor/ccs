@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use crate::lts::{self, Lts};
 
-use super::{list::*, ActionLabel, CCSSystem, Process, Relation};
+use super::{list::*, ActionLabel, BisimulationAlgorithm, CCSSystem, Process, Relation};
 
 /// State of the algorithm
 pub struct PaigeTarjan {
@@ -136,7 +136,7 @@ pub struct Block {
 
 
 impl PaigeTarjan {
-    fn new_with_labels(lts: Lts) -> Self {
+    pub fn new_with_labels(lts: Lts) -> Self {
         let mut block_map: BTreeMap<Vec<ActionLabel>, Vec<Rc<RefCell<State>>>> = BTreeMap::new();
         let mut labels = HashSet::new();
         let states: HashMap<_, _> = lts.states(false)
@@ -212,7 +212,7 @@ impl PaigeTarjan {
         }
     }
 
-    fn new(lts: Lts) -> Self {
+    pub fn new(lts: Lts) -> Self {
         let mut states: HashMap<_, _> = lts.states(false)
             .collect::<Vec<_>>().into_iter()
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
@@ -429,6 +429,28 @@ impl PaigeTarjan {
     }
 }
 
+impl BisimulationAlgorithm for PaigeTarjan {
+    fn bisimulation(&mut self, collect: bool) -> (Option<Relation>, Duration) {
+        let starting = Instant::now();
+
+        while !self.finished() {
+            self.refine();
+        }
+
+        let ending = Instant::now();
+        if collect {
+            let mut rel = Relation::new();
+            for block in self.p_blocks.iter() {
+                block.deref().borrow().register_into_relation(&mut rel);
+            }
+
+            (Some(rel), ending - starting)
+        } else {
+            (None, ending - starting)
+        }
+    }
+}
+
 impl Block {
     /// Create new, empty [`Block`]
     fn new() -> Self {
@@ -639,27 +661,3 @@ impl Transition {
         &mut self.borrow_mut().out_ref
     }
 }
-
-pub fn bisimulation(system: &CCSSystem, collect: bool) -> (Option<Relation>, Duration) {
-    let lts = Lts::new(system, true);
-    let mut pt = PaigeTarjan::new_with_labels(lts);
-
-    let starting = Instant::now();
-
-    while !pt.finished() {
-        pt.refine();
-    }
-
-    let ending = Instant::now();
-    if collect {
-        let mut rel = Relation::new();
-        for block in pt.p_blocks.iter() {
-            block.deref().borrow().register_into_relation(&mut rel);
-        }
-
-        (Some(rel), ending - starting)
-    } else {
-        (None, ending - starting)
-    }
-}
-

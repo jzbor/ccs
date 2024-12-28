@@ -12,11 +12,11 @@ use crate::lts::*;
 
 use super::list::ListRef;
 use super::list::RcList;
+use super::BisimulationAlgorithm;
 
-struct Fixpoint {
+pub struct Fixpoint {
     state_map: HashMap<Process, Rc<RefCell<State>>>,
     relation: Relation,
-
 }
 
 struct State {
@@ -33,7 +33,7 @@ struct Transition {
 }
 
 impl Fixpoint {
-    fn new(lts: Lts) -> Self {
+    pub fn new(lts: Lts) -> Self {
         let mut states: HashMap<_, _> = lts.states(false)
             .map(|s| (s.clone(), Rc::new(RefCell::new(State::new(s)))))
             .collect();
@@ -116,7 +116,26 @@ impl Fixpoint {
 
         rel
     }
+}
 
+impl BisimulationAlgorithm for Fixpoint {
+    fn bisimulation(&mut self, collect: bool) -> (Option<Relation>, Duration) {
+        let starting = Instant::now();
+
+        let mut last_size = self.relation.len() + 1;
+        while self.relation.len() < last_size {
+            last_size = self.relation.len();
+            self.refine();
+        }
+
+        let ending = Instant::now();
+
+        if collect {
+            (Some(self.relation.clone()), ending - starting)
+        } else {
+            (None, ending - starting)
+        }
+    }
 }
 
 impl State {
