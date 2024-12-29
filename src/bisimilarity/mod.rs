@@ -1,13 +1,13 @@
 use std::rc::Rc;
 use std::time::Duration;
 
-use fixpoint::Fixpoint;
+use naive::NaiveFixpoint;
 use paige_tarjan::PaigeTarjan;
 
 use crate::{ccs::*, ExtendedAlgorithmChoice};
 use crate::lts::Lts;
 
-mod fixpoint;
+mod naive;
 mod paige_tarjan;
 mod list;
 
@@ -32,7 +32,7 @@ pub fn bisimulation(system: &CCSSystem, algorithm: AlgorithmChoice, collect: boo
 
 fn bisimulation_algorithm(lts: Lts, algorithm: AlgorithmChoice) -> Box<dyn BisimulationAlgorithm> {
     match algorithm {
-        AlgorithmChoice::Naive => Box::new(Fixpoint::new(lts)),
+        AlgorithmChoice::Naive => Box::new(NaiveFixpoint::new(lts)),
         AlgorithmChoice::PaigeTarjan => Box::new(PaigeTarjan::new_with_labels(lts)),
     }
 }
