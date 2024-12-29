@@ -1,17 +1,17 @@
 use std::fs;
 
-use crate::{bisimilarity, parser};
+use crate::{bisimilarity::{self, AlgorithmChoice}, parser};
 
 
 fn compare_bisimulation_impls(file: &str) {
     let contents = fs::read_to_string(file).unwrap();
     let system = parser::parse(file.to_string(), &contents).unwrap();
 
-    let mut fix: Vec<_> = bisimilarity::bisimulation(&system, false, true).0.unwrap()
+    let mut fix: Vec<_> = bisimilarity::bisimulation(&system, AlgorithmChoice::Naive, true).0.unwrap()
         .into_iter()
         .map(|(p, q)| (p.to_string(), q.to_string()))
         .collect();
-    let mut pt: Vec<_> = bisimilarity::bisimulation(&system, true, true).0.unwrap()
+    let mut pt: Vec<_> = bisimilarity::bisimulation(&system, AlgorithmChoice::PaigeTarjan, true).0.unwrap()
         .into_iter()
         .map(|(p, q)| (p.to_string(), q.to_string()))
         .collect();
@@ -36,7 +36,7 @@ fn big_bisimulation() {
     let contents = fs::read_to_string(file).unwrap();
     let system = parser::parse(file.to_string(), &contents).unwrap();
 
-    bisimilarity::bisimulation(&system, true, false);
+    bisimilarity::bisimulation(&system, AlgorithmChoice::PaigeTarjan, false);
 }
 
 #[test]
@@ -47,5 +47,5 @@ fn very_big_bisimulation() {
     let contents = fs::read_to_string(file).unwrap();
     let system = parser::parse(file.to_string(), &contents).unwrap();
 
-    bisimilarity::bisimulation(&system, true, false);
+    bisimilarity::bisimulation(&system, AlgorithmChoice::PaigeTarjan, false);
 }

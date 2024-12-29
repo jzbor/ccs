@@ -2,7 +2,9 @@ use std::fs;
 use std::io;
 use std::process;
 
+use bisimilarity::AlgorithmChoice;
 use clap::Parser;
+use clap::ValueEnum;
 use error::CCSError;
 use error::CCSResult;
 use lts::Lts;
@@ -91,10 +93,6 @@ enum Subcommand {
         #[clap()]
         file: String,
 
-        /// Use faster Paige-Tarjan algorithm
-        #[clap(short, long)]
-        paige_tarjan: bool,
-
         /// Bench mark algorithm
         #[clap(short, long)]
         bench: bool,
@@ -103,9 +101,9 @@ enum Subcommand {
         #[clap(short, long)]
         relation: bool,
 
-        /// Compare algorithms
+        /// Choice of algorithm
         #[clap(short, long)]
-        algorithms: bool,
+        algorithm: ExtendedAlgorithmChoice,
     },
 
     /// Generate a random LTS and represent it as a parsable CCS spec
@@ -123,6 +121,14 @@ enum Subcommand {
         transitions: usize,
     }
 }
+
+#[derive(Clone, Copy, ValueEnum, PartialEq, Eq, Debug)]
+pub enum ExtendedAlgorithmChoice {
+    Naive,
+    PaigeTarjan,
+    Compare,
+}
+
 
 fn parse(file: String) -> CCSResult<()> {
     let contents = fs::read_to_string(&file)
@@ -237,7 +243,7 @@ fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()>
     Ok(())
 }
 
-fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, relation: bool, compare_algos: bool) -> CCSResult<()> {
+fn bisimilarity(file: String, algorithm: ExtendedAlgorithmChoice, bench: bool, relation: bool) -> CCSResult<()> {
     let contents = error::resolve(
         fs::read_to_string(&file)
             .map_err(CCSError::file_error)
@@ -247,8 +253,8 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, relation: bool, c
         Err(e) => {eprintln!("{}", e); process::exit(1) },
     };
 
-    if compare_algos {
-        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, true, relation);
+    if algorithm == ExtendedAlgorithmChoice::Compare {
+        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, AlgorithmChoice::PaigeTarjan, relation);
         println!("=== PAIGE-TARJAN ===");
         println!("took: {:?}\t", duration_pt);
         if let Some(bisim) = bisimulation_pt {
@@ -256,7 +262,7 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, relation: bool, c
         }
         println!();
 
-        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, false, relation);
+        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, AlgorithmChoice::Naive, relation);
         println!("=== NAIVE FIXPOINT ===");
         println!("took: {:?}\t", duration_nf);
         if let Some(bisim) = bisimulation_nf {
@@ -264,7 +270,7 @@ fn bisimilarity(file: String, paige_tarjan: bool, bench: bool, relation: bool, c
         }
         println!();
     } else {
-        let (bisimulation, duration) = bisimilarity::bisimulation(&system, paige_tarjan, relation);
+        let (bisimulation, duration) = bisimilarity::bisimulation(&system, algorithm.try_into().unwrap(), relation);
 
         if let Some(bisimulation) = bisimulation {
             if bisimulation.is_empty() {
@@ -298,7 +304,7 @@ fn main() {
         SyntaxTree { file } => syntax_tree(file),
         Trace { file, allow_duplicates } => trace(file, allow_duplicates),
         RandomLts { states, actions, transitions } => random(states, actions, transitions),
-        Bisimilarity { file, paige_tarjan, bench, relation, algorithms } => bisimilarity(file, paige_tarjan, bench, relation, algorithms),
+        Bisimilarity { file, bench, relation, algorithm } => bisimilarity(file, algorithm, bench, relation),
     };
 
     error::resolve(result);
