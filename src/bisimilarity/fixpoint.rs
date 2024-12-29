@@ -15,6 +15,7 @@ use super::list::RcList;
 use super::BisimulationAlgorithm;
 
 pub struct Fixpoint {
+    done: bool,
     state_map: HashMap<Process, Rc<RefCell<State>>>,
     relation: Relation,
 }
@@ -54,6 +55,7 @@ impl Fixpoint {
         Fixpoint {
             state_map: states,
             relation,
+            done: false,
         }
     }
 
@@ -120,6 +122,8 @@ impl Fixpoint {
 
 impl BisimulationAlgorithm for Fixpoint {
     fn bisimulation(&mut self, collect: bool) -> (Option<Relation>, Duration) {
+        assert!(!self.done);
+
         let starting = Instant::now();
 
         let mut last_size = self.relation.len() + 1;
@@ -170,26 +174,5 @@ impl Transition {
 
     fn trans_list_ref_mut(&mut self) -> &mut ListRef<Transition> {
         &mut self.trans_ref
-    }
-}
-
-pub fn bisimulation(system: &CCSSystem, collect: bool) -> (Option<Relation>, Duration) {
-    let lts = Lts::new(system, true);
-    let mut fix = Fixpoint::new(lts);
-
-    let starting = Instant::now();
-
-    let mut last_size = fix.relation.len() + 1;
-    while fix.relation.len() < last_size {
-        last_size = fix.relation.len();
-        fix.refine();
-    }
-
-    let ending = Instant::now();
-
-    if collect {
-        (Some(fix.relation), ending - starting)
-    } else {
-        (None, ending - starting)
     }
 }

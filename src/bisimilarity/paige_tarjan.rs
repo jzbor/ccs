@@ -12,10 +12,14 @@ use std::time::{Duration, Instant};
 
 use crate::lts::{self, Lts};
 
-use super::{list::*, ActionLabel, BisimulationAlgorithm, CCSSystem, Process, Relation};
+use super::list::*;
+use super::*;
 
 /// State of the algorithm
 pub struct PaigeTarjan {
+    /// Indicates whether bisimulation calculation has already been performed
+    done: bool,
+
     /// List of composed blocks.
     /// Linked by [`Block::c_ref`]
     c_blocks: RcList<Block>,
@@ -208,10 +212,13 @@ impl PaigeTarjan {
             c_blocks,
             r_blocks,
             p_blocks,
-            labels
+            labels,
+            done: false,
         }
     }
 
+    // TODO
+    #[allow(dead_code)]
     pub fn new(lts: Lts) -> Self {
         let mut states: HashMap<_, _> = lts.states(false)
             .collect::<Vec<_>>().into_iter()
@@ -271,7 +278,8 @@ impl PaigeTarjan {
             c_blocks,
             r_blocks,
             p_blocks,
-            labels
+            labels,
+            done: false,
         }
     }
 
@@ -431,6 +439,8 @@ impl PaigeTarjan {
 
 impl BisimulationAlgorithm for PaigeTarjan {
     fn bisimulation(&mut self, collect: bool) -> (Option<Relation>, Duration) {
+        assert!(!self.done);
+
         let starting = Instant::now();
 
         while !self.finished() {
