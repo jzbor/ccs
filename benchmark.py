@@ -5,13 +5,14 @@ import subprocess
 import sys
 
 LTS_FILE_NAME = "/tmp/benchmark.ccs"
+USE_PAIGE_TARJAN = False
 
 
-def bench(binary: str, step_width: int, nsteps: int):
+def bench(binary: str, step_width: int, nsteps: int, use_pt: bool):
     pt_times = []
     for s in range(step_width, step_width * nsteps + 1, step_width):
         for t in range(step_width, step_width * nsteps + 1, step_width):
-            pt = measure_time(binary, s, t, True)
+            pt = measure_time(binary, s, t, use_pt)
             pt_times.append((s, t, pt))
             print(f"finished {s}x{t}", file=sys.stderr)
 
@@ -21,10 +22,10 @@ def measure_time(binary: str, states: int, transitions: int, pt: bool) -> float:
     subprocess.call(f"{binary} random-lts -s {states} -t {transitions} -a 1 >{LTS_FILE_NAME}", shell=True)
 
     if pt:
-        flags = "-bp"
+        algo = "paige-tarjan"
     else:
-        flags = "-b"
-    args = [binary, "bisimilarity", flags, LTS_FILE_NAME]
+        algo = "naive"
+    args = [binary, "bisimilarity", "-b", "-a", algo, LTS_FILE_NAME]
     result = subprocess.run(args, stdout=subprocess.PIPE)
     result = result.stdout.decode("utf-8")
     #todo maybe check if both bisimilarities are equal
@@ -84,7 +85,7 @@ def main():
 
     print(f"Benchmarking {binary} with {nsteps} steps of width {step_width}")
 
-    data = bench(binary, step_width, nsteps)
+    data = bench(binary, step_width, nsteps, USE_PAIGE_TARJAN)
 
     with open(outfile, "w") as write:
         json.dump(data, write)

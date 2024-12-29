@@ -63,6 +63,22 @@ def render_transitions(filename: str, states: int, data):
     plt.savefig(f"{OUTDIR}/{filename}.svg");
     plt.savefig(f"{OUTDIR}/{filename}.png");
 
+def render_ratio(filename: str, rstates: int, rtransitions: int, data):
+    fig = plt.figure()
+    ax = fig.add_subplot()
+
+    low_data = [(st, tr, ti) for (st, tr, ti) in data if rstates * st == rtransitions * tr]
+
+    x_coordinates, _, times = unzip(low_data)
+    ax.scatter(x_coordinates, times, marker = 'o')
+
+    ax.set_xlabel(f"number of states ({rstates}:{rtransitions} states to transitions)")
+    ax.set_ylabel("time in seconds")
+    ax.set_ylim(bottom=0)
+
+    plt.savefig(f"{OUTDIR}/{filename}.svg");
+    plt.savefig(f"{OUTDIR}/{filename}.png");
+
 def main():
     infile = "benchmark.json"
 
@@ -84,6 +100,9 @@ def main():
     render_transitions("transitions_low", data[0][0], data)
     render_transitions("transitions_high", data[len(data) - 1][0], data)
     render_transitions("transitions_med", data[len(data) -1][0] // 2, data)
+    render_ratio("1to1", 1, 1, data)
+    render_ratio("2to1", 2, 1, data)
+    render_ratio("1to2", 1, 2, data)
 
 
 if __name__ == '__main__':
