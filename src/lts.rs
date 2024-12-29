@@ -154,7 +154,7 @@ impl Lts {
     }
 }
 
-impl<'a> Iterator for LtsTransitionIterator<'a> {
+impl Iterator for LtsTransitionIterator<'_> {
     type Item = Transition;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -186,7 +186,7 @@ impl<'a> Iterator for LtsTransitionIterator<'a> {
     }
 }
 
-impl<'a> Iterator for LtsStateIterator<'a> {
+impl Iterator for LtsStateIterator<'_> {
     type Item = Process;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -211,7 +211,7 @@ impl<'a> Iterator for LtsStateIterator<'a> {
     }
 }
 
-impl<'a> Iterator for LtsTraceIterator<'a> {
+impl Iterator for LtsTraceIterator<'_> {
     type Item = Trace;
 
     fn next(&mut self) -> Option<Self::Item> {

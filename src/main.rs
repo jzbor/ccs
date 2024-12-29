@@ -252,7 +252,7 @@ fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()>
 }
 
 fn compare_bisimulation_algorithms(system: &CCSSystem, relation: bool) {
-        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, AlgorithmChoice::PaigeTarjan, relation);
+        let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(system, AlgorithmChoice::PaigeTarjan, relation);
         println!("=== PAIGE-TARJAN ===");
         println!("took: {:?}\t", duration_pt);
         if let Some(bisim) = bisimulation_pt {
@@ -260,7 +260,7 @@ fn compare_bisimulation_algorithms(system: &CCSSystem, relation: bool) {
         }
         println!();
 
-        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(&system, AlgorithmChoice::Naive, relation);
+        let (bisimulation_nf, duration_nf) = bisimilarity::bisimulation(system, AlgorithmChoice::Naive, relation);
         println!("=== NAIVE FIXPOINT ===");
         println!("took: {:?}\t", duration_nf);
         if let Some(bisim) = bisimulation_nf {

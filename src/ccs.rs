@@ -41,7 +41,7 @@ impl CCSSystem {
 
     pub fn zip(system1: Self, system2: Self) -> CCSResult<Self> {
         for proc in system1.processes.keys() {
-            if system2.processes.get(proc).is_some() {
+            if system2.processes.contains_key(proc) {
                 return Err(CCSError::overlapping_process_error(proc.clone()))
             }
         }
@@ -79,10 +79,7 @@ impl Process {
         use Process::*;
         match self {
             Deadlock() => (),
-            ProcessName(name) => match system.processes().get(name) {
-                Some(p) => p.direct_successors_helper(system, set),
-                None => (),
-            },
+            ProcessName(name) => if let Some(p) = system.processes().get(name) { p.direct_successors_helper(system, set) },
             Action(label, process) => { set.insert((label.clone(), *process.clone())); },
             NonDetChoice(left, right) => {
                 left.direct_successors_helper(system, set);
