@@ -110,7 +110,7 @@ enum Subcommand {
         relation: bool,
 
         /// Choice of algorithm
-        #[clap(short, long)]
+        #[clap(short, long, default_value = "paige-tarjan")]
         algorithm: ExtendedAlgorithmChoice,
     },
 
