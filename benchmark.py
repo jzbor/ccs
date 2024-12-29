@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 LTS_FILE_NAME = "/tmp/benchmark.ccs"
-USE_PAIGE_TARJAN = False
+USE_PAIGE_TARJAN = True
 
 
 def bench(binary: str, step_width: int, nsteps: int, use_pt: bool):
