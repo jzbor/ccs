@@ -1,3 +1,3 @@
-P1 = (CS | BM) \ coin \ coffee \ tea
-BM = coin.(coffee'.BM + tea'.BM)
-CS = pub'.coin'.coffee.CS
+P1 = (CS1 | BM1) \ coin \ coffee \ tea
+BM1 = coin.(coffee'.BM1 + tea'.BM1)
+CS1 = pub'.coin'.coffee.CS1

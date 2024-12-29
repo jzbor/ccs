@@ -2,7 +2,7 @@ use std::process;
 
 use thiserror::Error;
 
-use crate::parser;
+use crate::{ccs::ProcessName, parser};
 
 pub type CCSResult<T> = Result<T, CCSError>;
 
@@ -28,6 +28,9 @@ pub enum CCSError {
 
     #[error("Child Error: child exited with error '{0}'")]
     ChildExited(i32),
+
+    #[error("Overlapping Process Names: process '{0}' exists in both systems")]
+    OverlappingProcess(ProcessName),
 }
 
 impl CCSError {
@@ -55,6 +58,10 @@ impl CCSError {
 
     pub fn file_error(e: std::io::Error) -> Self {
         CCSError::File(e)
+    }
+
+    pub fn overlapping_process_error(process: ProcessName) -> Self {
+        CCSError::OverlappingProcess(process)
     }
 
     pub fn syntax_error(e: pest::error::Error<parser::Rule>) -> Self {

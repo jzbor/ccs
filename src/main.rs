@@ -1,8 +1,12 @@
 use std::fs;
 use std::io;
 use std::process;
+use std::rc::Rc;
 
+use bisimilarity::bisimulation_algorithm;
 use bisimilarity::AlgorithmChoice;
+use ccs::CCSSystem;
+use ccs::Process;
 use clap::Parser;
 use clap::ValueEnum;
 use error::CCSError;
@@ -92,6 +96,10 @@ enum Subcommand {
         /// File with CCS specification
         #[clap()]
         file: String,
+
+        /// Other specification to compare the first to?
+        #[clap()]
+        other_file: Option<String>,
 
         /// Bench mark algorithm
         #[clap(short, long)]
@@ -243,17 +251,7 @@ fn random(nstates: usize, nactions: usize, ntransitions: usize) -> CCSResult<()>
     Ok(())
 }
 
-fn bisimilarity(file: String, algorithm: ExtendedAlgorithmChoice, bench: bool, relation: bool) -> CCSResult<()> {
-    let contents = error::resolve(
-        fs::read_to_string(&file)
-            .map_err(CCSError::file_error)
-    );
-    let system = match parser::parse(file, &contents) {
-        Ok(system) => system,
-        Err(e) => {eprintln!("{}", e); process::exit(1) },
-    };
-
-    if algorithm == ExtendedAlgorithmChoice::Compare {
+fn compare_bisimulation_algorithms(system: &CCSSystem, relation: bool) {
         let (bisimulation_pt, duration_pt) = bisimilarity::bisimulation(&system, AlgorithmChoice::PaigeTarjan, relation);
         println!("=== PAIGE-TARJAN ===");
         println!("took: {:?}\t", duration_pt);
@@ -269,27 +267,57 @@ fn bisimilarity(file: String, algorithm: ExtendedAlgorithmChoice, bench: bool, r
             println!("size of bisimulation: {:?}", bisim.len());
         }
         println!();
-    } else {
-        let (bisimulation, duration) = bisimilarity::bisimulation(&system, algorithm.try_into().unwrap(), relation);
+}
 
-        if let Some(bisimulation) = bisimulation {
-            if bisimulation.is_empty() {
-                println!("No bisimulation found");
-            } else {
-                println!("The bisimulation \"=BS=\":");
-            }
+fn bisimilarity(file: String, other_file: Option<String>, algorithm_choice: ExtendedAlgorithmChoice, bench: bool, print_relation: bool) -> CCSResult<()> {
+    let (roots, system) = match other_file {
+        Some(other_file) => {
+            let system1 = CCSSystem::from_file(&file)?;
+            let system2 = CCSSystem::from_file(&other_file)?;
+            (Some((system1.destinct_process().clone(), system2.destinct_process().clone())), CCSSystem::zip(system1, system2)?)
+        },
+        None => (None, CCSSystem::from_file(&file)?),
+    };
 
-            for (s, t) in &bisimulation {
-                println!("  {} \t=BS= \t{}", s, t);
-            }
+    let collect = print_relation || roots.is_some();
 
-            println!();
+    if algorithm_choice == ExtendedAlgorithmChoice::Compare {
+        compare_bisimulation_algorithms(&system, collect);
+        return Ok(());
+    }
+
+    let lts = Lts::new(&system, true);
+    let mut algorithm = bisimulation_algorithm(lts, algorithm_choice.try_into().unwrap());
+    let (relation, duration) = algorithm.bisimulation(collect);
+
+    if print_relation {
+        let relation = relation.as_ref().unwrap();
+
+        if relation.is_empty() {
+            println!("No bisimulation found");
+        } else {
+            println!("The bisimulation \"=BS=\":");
         }
 
-        if bench {
-            println!("took {:?}", duration);
+        for (s, t) in relation {
+            println!("  {} \t=BS= \t{}", s, t);
+        }
+        println!();
+    }
+
+    if bench {
+        println!("took {:?}", duration);
+    }
+
+    if let Some((proc1, proc2)) = roots {
+        let expected = (Rc::new(Process::ProcessName(proc1)), Rc::new(Process::ProcessName(proc2)));
+        if relation.unwrap().contains(&expected) {
+            println!("=> Systems are bisimilar");
+        } else {
+            println!("=> Systems are NOT bisimilar");
         }
     }
+
     Ok(())
 }
 
@@ -304,7 +332,7 @@ fn main() {
         SyntaxTree { file } => syntax_tree(file),
         Trace { file, allow_duplicates } => trace(file, allow_duplicates),
         RandomLts { states, actions, transitions } => random(states, actions, transitions),
-        Bisimilarity { file, bench, relation, algorithm } => bisimilarity(file, algorithm, bench, relation),
+        Bisimilarity { file, bench, relation, algorithm, other_file } => bisimilarity(file, other_file, algorithm, bench, relation),
     };
 
     error::resolve(result);

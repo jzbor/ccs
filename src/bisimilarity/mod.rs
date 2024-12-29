@@ -30,7 +30,7 @@ pub fn bisimulation(system: &CCSSystem, algorithm: AlgorithmChoice, collect: boo
     bsa.bisimulation(collect)
 }
 
-fn bisimulation_algorithm(lts: Lts, algorithm: AlgorithmChoice) -> Box<dyn BisimulationAlgorithm> {
+pub fn bisimulation_algorithm(lts: Lts, algorithm: AlgorithmChoice) -> Box<dyn BisimulationAlgorithm> {
     match algorithm {
         AlgorithmChoice::Naive => Box::new(NaiveFixpoint::new(lts)),
         AlgorithmChoice::PaigeTarjan => Box::new(PaigeTarjan::new_with_labels(lts)),

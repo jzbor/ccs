@@ -1,4 +1,6 @@
-use std::{collections::{HashMap, HashSet, VecDeque}, fmt::Display, rc::Rc};
+use std::{collections::{HashMap, HashSet, VecDeque}, fmt::Display, fs, rc::Rc};
+
+use crate::{error::{self, CCSError, CCSResult}, parser};
 
 const TAU: &str = "τ";
 
@@ -27,6 +29,29 @@ pub enum Process {
 impl CCSSystem {
     pub fn new(name: String, processes: HashMap<ProcessName, Process>, destinct_process: ProcessName) -> Self {
         CCSSystem { name, processes, destinct_process }
+    }
+
+    pub fn from_file(path: &str) -> CCSResult<Self> {
+        let contents = error::resolve(
+            fs::read_to_string(path)
+                .map_err(CCSError::file_error)
+        );
+        parser::parse(path.to_owned(), &contents)
+    }
+
+    pub fn zip(system1: Self, system2: Self) -> CCSResult<Self> {
+        for proc in system1.processes.keys() {
+            if system2.processes.get(proc).is_some() {
+                return Err(CCSError::overlapping_process_error(proc.clone()))
+            }
+        }
+
+        let destinct_process = system1.destinct_process.clone();
+        let name = format!("{}+{}", system1.name, system2.name);
+        let mut processes = system1.processes;
+        processes.extend(system2.processes);
+
+        Ok(CCSSystem { name, processes, destinct_process })
     }
 
     pub fn processes(&self) -> &HashMap<ProcessName, Process> {
