@@ -64,6 +64,19 @@
           echo "output: $(pwd)/profile.perf"
         '';
       };
+
+      convert-profile = pkgs.writeShellApplication {
+        name = "convert-profile";
+        runtimeInputs = with pkgs; [
+          linuxPackages_latest.perf
+        ];
+        text = ''
+          perf script -F +pid > profile.perf
+          rm perf.data
+          echo "output: $(pwd)/profile.perf"
+        '';
+      };
+
     };
 
     devShells.default = craneLib.devShell {

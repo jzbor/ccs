@@ -78,7 +78,10 @@ impl NaiveFixpoint {
         self.apply_f()
     }
 
-    fn is_in_f(&self, s: Rc<RefCell<State>>, t: Rc<RefCell<State>>) -> bool {
+    fn is_in_f(&self, procs: &(Rc<Process>, Rc<Process>)) -> bool {
+        let s = self.state_map.get(&procs.0).unwrap().clone();
+        let t = self.state_map.get(&procs.1).unwrap().clone();
+
         // check s -a-> s'  ==>  t -a-> t'
         for strans in s.deref().borrow().transitions.iter() {
             let mut t_next = false;
@@ -113,11 +116,9 @@ impl NaiveFixpoint {
     }
 
     fn apply_f(&mut self) {
-        self.relation = self.relation.iter()
-            .map(|(s, t)| (self.state_map.get(s).unwrap().clone(), self.state_map.get(t).unwrap().clone()))
-            .filter(|(s, t)| self.is_in_f(s.clone(), t.clone()))
-            .map(|(s, t)| (s.deref().borrow().desc.clone(), t.deref().borrow().desc.clone()))
-            .collect()
+        let mut cloned = self.relation.clone();
+        cloned.retain(|e| self.is_in_f(e));
+        self.relation = cloned;
     }
 
     fn init_relation(states: &RcList<State>) -> Relation {
