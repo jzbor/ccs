@@ -14,22 +14,36 @@ use super::list::ListRef;
 use super::list::RcList;
 use super::BisimulationAlgorithm;
 
+/// Naive fixpoint implementation for solving bisimilarity
 pub struct NaiveFixpoint {
+    /// Indicates whether the algorithm has already been run
     done: bool,
+
+    /// Maps all process descriptions to their states
     state_map: HashMap<Process, Rc<RefCell<State>>>,
+
+    /// Relation that is constructed by iterative refinement
     relation: Relation,
 }
 
+/// State in the naive fixpoint algorithm
 struct State {
+    /// Process description that is the source of this state
     desc: Rc<Process>,
+
+    /// Outgoing transitions
     transitions: RcList<Transition>,
 
+    /// List of all states
     all_ref: ListRef<Self>,
 }
 
+/// Transition in the naive fixpoint algorithm
 struct Transition {
+    /// Process description that is the source of this transition
     desc: lts::Transition,
 
+    /// List of all transitions
     trans_ref: ListRef<Self>,
 }
 
