@@ -279,16 +279,14 @@ fn bisimilarity(file: String, other_file: Option<String>, algorithm_choice: Exte
         None => (None, CCSSystem::from_file(&file)?),
     };
 
-    let collect = print_relation || roots.is_some();
-
     if algorithm_choice == ExtendedAlgorithmChoice::Compare {
-        compare_bisimulation_algorithms(&system, collect);
+        compare_bisimulation_algorithms(&system, print_relation);
         return Ok(());
     }
 
     let lts = Lts::new(&system, true);
     let mut algorithm = bisimulation_algorithm(lts, algorithm_choice.try_into().unwrap());
-    let (relation, duration) = algorithm.bisimulation(collect);
+    let (relation, duration) = algorithm.bisimulation(print_relation);
 
     if print_relation {
         let relation = relation.as_ref().unwrap();
@@ -311,7 +309,7 @@ fn bisimilarity(file: String, other_file: Option<String>, algorithm_choice: Exte
 
     if let Some((proc1, proc2)) = roots {
         let expected = (Rc::new(Process::ProcessName(proc1)), Rc::new(Process::ProcessName(proc2)));
-        if relation.unwrap().contains(&expected) {
+        if algorithm.check(expected)? {
             println!("=> Systems are bisimilar");
         } else {
             println!("=> Systems are NOT bisimilar");

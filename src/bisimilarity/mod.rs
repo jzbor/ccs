@@ -4,6 +4,7 @@ use std::time::Duration;
 use naive::NaiveFixpoint;
 use paige_tarjan::PaigeTarjan;
 
+use crate::error::CCSResult;
 use crate::{ccs::*, ExtendedAlgorithmChoice};
 use crate::lts::Lts;
 
@@ -21,6 +22,7 @@ pub enum AlgorithmChoice {
 
 pub trait BisimulationAlgorithm {
     fn bisimulation(&mut self, collect: bool) -> (Option<Relation>, Duration);
+    fn check(&mut self, procs: (Rc<Process>, Rc<Process>)) -> CCSResult<bool>;
 }
 
 

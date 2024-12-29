@@ -7,9 +7,11 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
+use std::ptr;
 use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
 
+use crate::error::CCSError;
 use crate::lts::{self, Lts};
 
 use super::list::*;
@@ -33,6 +35,8 @@ pub struct PaigeTarjan {
     p_blocks: RcList<Block>,
 
     labels: Vec<ActionLabel>,
+
+    states: RcList<State>,
 }
 
 /// A state in the underlying [LTS](https://en.wikipedia.org/wiki/Transition_system)
@@ -141,6 +145,7 @@ pub struct Block {
 
 impl PaigeTarjan {
     pub fn new_with_labels(lts: Lts) -> Self {
+        let mut all_states = RcList::new(State::all_list_ref, State::all_list_ref_mut);
         let mut block_map: BTreeMap<Vec<ActionLabel>, Vec<Rc<RefCell<State>>>> = BTreeMap::new();
         let mut labels = HashSet::new();
         let states: HashMap<_, _> = lts.states(false)
@@ -160,6 +165,7 @@ impl PaigeTarjan {
 
         // create partitions
         for state in states.into_values() {
+            all_states.append(state.clone());
             let mut labels = Vec::new();
             for trans in state.deref().borrow().out_transitions.iter() {
                 labels.push(trans.deref().borrow().desc.1.clone());
@@ -213,6 +219,7 @@ impl PaigeTarjan {
             r_blocks,
             p_blocks,
             labels,
+            states: all_states,
             done: false,
         }
     }
@@ -279,6 +286,7 @@ impl PaigeTarjan {
             r_blocks,
             p_blocks,
             labels,
+            states: all_states,
             done: false,
         }
     }
@@ -448,6 +456,8 @@ impl BisimulationAlgorithm for PaigeTarjan {
         }
 
         let ending = Instant::now();
+        self.done = true;
+
         if collect {
             let mut rel = Relation::new();
             for block in self.p_blocks.iter() {
@@ -458,6 +468,23 @@ impl BisimulationAlgorithm for PaigeTarjan {
         } else {
             (None, ending - starting)
         }
+    }
+
+    fn check(&mut self, procs: (Rc<Process>, Rc<Process>)) -> CCSResult<bool> {
+        if !self.done {
+            return Err(CCSError::results_not_available())
+        }
+
+        let ptr1 = match self.states.iter().find(|s| (*s).deref().borrow().process == procs.0) {
+            Some(s) => s.deref().borrow().block_in_p.as_ptr(),
+            None => return Ok(false),
+        };
+        let ptr2 = match self.states.iter().find(|s| (*s).deref().borrow().process == procs.1) {
+            Some(s) => s.deref().borrow().block_in_p.as_ptr(),
+            None => return Ok(false),
+        };
+
+        Ok(ptr::eq(ptr1, ptr2))
     }
 }
 

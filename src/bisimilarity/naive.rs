@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use crate::bisimilarity::Relation;
 use crate::ccs::*;
+use crate::error::CCSError;
 use crate::lts;
 use crate::lts::*;
 
@@ -147,12 +148,21 @@ impl BisimulationAlgorithm for NaiveFixpoint {
         }
 
         let ending = Instant::now();
+        self.done = true;
 
         if collect {
             (Some(self.relation.clone()), ending - starting)
         } else {
             (None, ending - starting)
         }
+    }
+
+    fn check(&mut self, procs: (Rc<Process>, Rc<Process>)) -> crate::error::CCSResult<bool> {
+        if !self.done {
+            return Err(CCSError::results_not_available())
+        }
+
+        Ok(self.relation.contains(&procs))
     }
 }
 

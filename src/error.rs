@@ -31,7 +31,11 @@ pub enum CCSError {
 
     #[error("Overlapping Process Names: process '{0}' exists in both systems")]
     OverlappingProcess(ProcessName),
+
+    #[error("Results are not yet calculated (this is probably a bug)")]
+    ResultsNotAvailable(),
 }
+
 
 impl CCSError {
     pub fn parsing_unexpected_rule(rule: parser::Rule, span: &pest::Span) -> Self {
@@ -66,6 +70,10 @@ impl CCSError {
 
     pub fn syntax_error(e: pest::error::Error<parser::Rule>) -> Self {
         CCSError::SyntaxError(Box::new(e))
+    }
+
+    pub fn results_not_available() -> Self {
+        CCSError::ResultsNotAvailable()
     }
 }
 
