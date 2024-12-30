@@ -38,7 +38,7 @@ def render_states(filename: str, transitions: int, data):
     low_data = [(st, tr, ti) for (st, tr, ti) in data if tr == transitions]
 
     x_coordinates, _, times = unzip(low_data)
-    ax.scatter(x_coordinates, times, marker = 'o')
+    ax.plot(x_coordinates, times, marker = 'o')
 
     ax.set_xlabel(f"number of states ({transitions} transitions)")
     ax.set_ylabel("time in seconds")
@@ -54,7 +54,7 @@ def render_transitions(filename: str, states: int, data):
     low_data = [(st, tr, ti) for (st, tr, ti) in data if st == states]
 
     _, x_coordinates, times = unzip(low_data)
-    ax.scatter(x_coordinates, times, marker = 'o')
+    ax.plot(x_coordinates, times, marker = 'o')
 
     ax.set_xlabel(f"number of transitions ({states} states)")
     ax.set_ylabel("time in seconds")
@@ -70,7 +70,7 @@ def render_ratio(filename: str, rstates: int, rtransitions: int, data):
     low_data = [(st, tr, ti) for (st, tr, ti) in data if rstates * st == rtransitions * tr]
 
     x_coordinates, _, times = unzip(low_data)
-    ax.scatter(x_coordinates, times, marker = 'o')
+    ax.plot(x_coordinates, times, marker = 'o')
 
     ax.set_xlabel(f"number of states ({rstates}:{rtransitions} states to transitions)")
     ax.set_ylabel("time in seconds")
