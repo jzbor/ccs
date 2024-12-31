@@ -7,8 +7,7 @@ jobs:
   call:
     uses: jzbor/nix-flake-workflow/.github/workflows/reusable-flake-workflow.yml@main
     with:
-      magic-cache: true
-      # binary-cache: false
+      binary-cache: true
       architectures: '["x86_64-linux", "aarch64-linux"]'
     secrets:
       ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
