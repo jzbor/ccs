@@ -1,7 +1,12 @@
 [package]
 name = "ccs"
 version = "0.1.0"
+description = "A simple implementation of the Calculus of Communicating Systems by Robin Milner"
+homepage = "https://github.com/jzbor/ccs"
+repository = "https://github.com/jzbor/ccs"
 edition = "2021"
+license = "MIT"
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
